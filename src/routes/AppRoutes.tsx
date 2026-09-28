@@ -1,8 +1,9 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
-import ChatPage from "@/pages/chat/ChatPage";
+import { ProtectedRoute } from "@/auth/ProtectedRoute";
 import LoginPage from "@/pages/auth/LoginPage";
 import RegisterPage from "@/pages/auth/RegistrationPage";
+import ChatPage from "@/pages/chat/ChatPage";
 
 export default function AppRoutes() {
   return (
@@ -12,7 +13,14 @@ export default function AppRoutes() {
 
         <Route path="/register" element={<RegisterPage />} />
 
-        <Route path="/chat" element={<ChatPage />} />
+        <Route
+          path="/chat"
+          element={
+            <ProtectedRoute>
+              <ChatPage />
+            </ProtectedRoute>
+          }
+        />
 
         <Route path="/" element={<Navigate to="/chat" replace />} />
 
