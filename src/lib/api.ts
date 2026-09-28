@@ -28,9 +28,9 @@ async function refresh() {
     refreshPromise = api
       .post<{ accessToken: string }>("/auth/refresh")
       .then(({ data }) => {
-        setAccessToken(data.accessToken);
+        setAccessToken(data?.data.accessToken);
 
-        return data.accessToken;
+        return data?.data.accessToken;
       })
       .finally(() => {
         refreshPromise = null;

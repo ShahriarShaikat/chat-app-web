@@ -4,12 +4,25 @@ import { useState } from "react";
 import Logo from "@/components/Logo";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 
 export default function LoginPage() {
   const register = false;
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const handleSubmit = () => {
+    if (email && password) {
+      login(email, password);
+      navigate("/chat", {
+        replace: true,
+      });
+    }
+  };
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#f8f8fc] px-4 py-10">
@@ -59,6 +72,8 @@ export default function LoginPage() {
                 <Input
                   className="field"
                   type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                 />
               </label>
@@ -69,6 +84,8 @@ export default function LoginPage() {
                     className="field pr-12"
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                   />
                   <button
                     type="button"
@@ -114,7 +131,7 @@ export default function LoginPage() {
                 </div>
               )}
               <button
-                onClick={() => navigate("/login")}
+                onClick={handleSubmit}
                 className="mt-2 flex h-11 items-center justify-center rounded-xl bg-[#6253d9] text-sm font-semibold text-white transition hover:bg-[#5143c8]"
               >
                 {register ? "Create account" : "Sign in"}

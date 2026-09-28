@@ -13,5 +13,9 @@ export function ProtectedRoute({ children }: { children: JSX.Element }) {
     return <Navigate to="/login" replace />;
   }
 
+  // if (status === "authenticated") {
+  //   return <Navigate to="/chat" replace />;
+  // }
+
   return children;
 }
