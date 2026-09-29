@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   getCurrentUser,
-  login as loginApi,
   logout as logoutApi,
   refreshAccessToken,
 } from "./auth-api";
@@ -19,17 +18,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<AuthContextValue["status"]>("loading");
   const hasFetched = useRef(false);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const loginResponse = await loginApi(email, password);
+  const invokeLogin = useCallback(async (accessToken: string) => {
+    // const loginResponse = await loginApi(email, password);
 
-    if (loginResponse.success && loginResponse?.payload) {
-      setAccessToken(loginResponse.payload.accessToken);
-      setAccessTokenState(loginResponse.payload.accessToken);
-      const currentUserRes = await getCurrentUser();
-      if (currentUserRes.success && currentUserRes.payload) {
-        setUser(currentUserRes.payload);
-        setStatus("authenticated");
-      }
+    // if (loginResponse.success && loginResponse?.payload) {
+
+    // }
+
+    setAccessToken(accessToken);
+    setAccessTokenState(accessToken);
+    const currentUserRes = await getCurrentUser();
+    if (currentUserRes.success && currentUserRes.payload) {
+      setUser(currentUserRes.payload);
+      setStatus("authenticated");
     }
   }, []);
 
@@ -95,10 +96,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       accessToken: accessTokenState,
       user,
       status,
-      login,
+      invokeLogin,
       logout,
     }),
-    [accessTokenState, user, status, login, logout],
+    [accessTokenState, user, status, invokeLogin, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -6,7 +6,7 @@ export interface AuthContextValue {
   user: User | null;
   status: "loading" | "authenticated" | "unauthenticated";
 
-  login: (email: string, password: string) => Promise<void>;
+  invokeLogin: (accessToken: string) => Promise<void>;
 
   logout: () => Promise<void>;
 }

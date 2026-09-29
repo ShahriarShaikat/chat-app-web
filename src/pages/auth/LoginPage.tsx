@@ -1,28 +1,85 @@
-import { Eye, EyeOff, Zap } from "lucide-react";
-import { useState } from "react";
-
+import { login } from "@/auth/auth-api";
 import Logo from "@/components/Logo";
+import LabeledInput from "@/components/styled-Input/LabelInput";
+import LabelPasswordInput from "@/components/styled-Input/LabelPasswordInput";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
+import { loginSchema, type TLoginSchema } from "@/lib/zod/login";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Lock, Mail, Zap } from "lucide-react";
+import { enqueueSnackbar } from "notistack";
+import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 
 export default function LoginPage() {
   const register = false;
   const navigate = useNavigate();
-  const { login } = useAuth();
-  const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const { invokeLogin } = useAuth();
 
-  const handleSubmit = () => {
-    if (email && password) {
-      login(email, password);
-      navigate("/chat", {
-        replace: true,
+  const {
+    control,
+    handleSubmit,
+    reset,
+    setError,
+    // watch,
+    formState: { errors, isSubmitting },
+  } = useForm<TLoginSchema>({
+    resolver: zodResolver(loginSchema),
+    mode: "onBlur",
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
+
+  const onSubmit = async (values: TLoginSchema) => {
+    console.log("🚀 ~ onSubmit ~ values:", values);
+    try {
+      const loginResponse = await login(values.email, values.password);
+      if (loginResponse?.success && loginResponse.payload) {
+        await invokeLogin(loginResponse.payload.accessToken);
+        enqueueSnackbar("Login Successfully", {
+          anchorOrigin: { horizontal: "center", vertical: "bottom" },
+          autoHideDuration: 3000,
+          variant: "success",
+        });
+        reset();
+        navigate("/chat");
+      } else {
+        setError("root", {
+          type: "server",
+          message: "Invalid email or password",
+        });
+        // showReport(
+        //   "Error",
+        //   "Blacklist Failed",
+        //   response.error?.message ||
+        //     response.message ||
+        //     "Unable to create this blacklist entry.",
+        // );
+      }
+    } catch (error) {
+      console.log("🚀 ~ onSubmit ~ error:", error);
+      setError("root", {
+        type: "server",
+        message: "Invalid email or password",
       });
+      // showReport(
+      //   "Error",
+      //   "Unexpected Error",
+      //   "An unexpected error occurred. Please try again.",
+      // );
     }
   };
+
+  // const handleSubmit = () => {
+  //   if (email && password) {
+  //     login(email, password);
+  //     navigate("/chat", {
+  //       replace: true,
+  //     });
+  //   }
+  // };
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#f8f8fc] px-4 py-10">
@@ -60,67 +117,27 @@ export default function LoginPage() {
                   : "Sign in to continue to your conversations."}
               </p>
             </div>
-            <div className="flex flex-col gap-4">
-              {register && (
-                <label className="grid gap-2 text-sm font-medium">
-                  Full name
-                  <Input className="field" placeholder="Alex Morgan" />
-                </label>
-              )}
-              <label className="grid gap-2 text-sm font-medium">
-                Email
-                <Input
-                  className="field"
+            <form onSubmit={handleSubmit(onSubmit)}>
+              <div className="flex flex-col gap-4">
+                <LabeledInput
+                  label="Email"
+                  name="email"
                   type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
+                  control={control}
+                  placeholder="alex@example.com"
+                  icon={<Mail className="size-4" />}
+                  iconPosition="left"
+                  error={errors.email}
                 />
-              </label>
-              <label className="grid gap-2 text-sm font-medium">
-                Password
-                <div className="relative">
-                  <Input
-                    className="field pr-12"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    aria-label="Toggle password visibility"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                  >
-                    {showPassword ? (
-                      <Eye className="size-3.5" />
-                    ) : (
-                      <EyeOff className="size-3.5" />
-                    )}
-                  </button>
-                </div>
-              </label>
-              {register && (
-                <label className="grid gap-2 text-sm font-medium">
-                  Confirm password
-                  <Input
-                    className="field"
-                    type="password"
-                    placeholder="••••••••"
-                  />
-                </label>
-              )}
-              {register ? (
-                <label className="flex items-start gap-2 text-xs text-muted-foreground">
-                  <Checkbox className="mt-0.5 accent-[#6253d9]" /> I agree to
-                  the <span className="font-medium text-foreground">Terms</span>{" "}
-                  and{" "}
-                  <span className="font-medium text-foreground">
-                    Privacy Policy
-                  </span>
-                </label>
-              ) : (
+
+                <LabelPasswordInput
+                  label="Password"
+                  name="password"
+                  control={control}
+                  placeholder="Enter your password"
+                  icon={<Lock className="size-4" />}
+                  error={errors.password}
+                />
                 <div className="flex items-center justify-between text-xs">
                   <label className="flex items-center gap-2 text-muted-foreground">
                     <Checkbox className="mt-0.5 accent-[#6253d9]" /> Remember me
@@ -129,29 +146,38 @@ export default function LoginPage() {
                     Forgot password?
                   </button>
                 </div>
-              )}
-              <button
-                onClick={handleSubmit}
-                className="mt-2 flex h-11 items-center justify-center rounded-xl bg-[#6253d9] text-sm font-semibold text-white transition hover:bg-[#5143c8]"
-              >
-                {register ? "Create account" : "Sign in"}
-              </button>
-              <div className="flex items-center gap-3 py-1 text-xs text-muted-foreground">
-                <div className="h-px flex-1 bg-border" /> OR{" "}
-                <div className="h-px flex-1 bg-border" />
+
+                {errors?.root && (
+                  <div>
+                    <p className="text-sm font-normal text-destructive">
+                      {errors?.root?.message}
+                    </p>
+                  </div>
+                )}
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="mt-2 flex h-11 items-center justify-center rounded-xl bg-[#6253d9] text-sm font-semibold text-white transition hover:bg-[#5143c8]"
+                >
+                  Sign in
+                </button>
+                <div className="flex items-center gap-3 py-1 text-xs text-muted-foreground">
+                  <div className="h-px flex-1 bg-border" /> OR{" "}
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+                <button className="flex h-11 items-center justify-center gap-2 rounded-xl border border-border text-sm font-medium transition hover:bg-muted">
+                  <span className="text-base font-bold">G</span> Continue with
+                  Google
+                </button>
               </div>
-              <button className="flex h-11 items-center justify-center gap-2 rounded-xl border border-border text-sm font-medium transition hover:bg-muted">
-                <span className="text-base font-bold">G</span> Continue with
-                Google
-              </button>
-            </div>
+            </form>
             <p className="mt-8 text-center text-sm text-muted-foreground">
-              {register ? "Already have an account?" : "Don't have an account?"}{" "}
+              Don't have an account?{" "}
               <button
                 onClick={() => navigate("/register")}
                 className="font-semibold text-[#6253d9]"
               >
-                {register ? "Sign in" : "Create an account"}
+                Create an account
               </button>
             </p>
           </div>
