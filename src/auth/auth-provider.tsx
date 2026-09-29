@@ -1,14 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   getCurrentUser,
   login as loginApi,
   logout as logoutApi,
+  refreshAccessToken,
 } from "./auth-api";
 
 import { setAccessToken } from "./token-store";
 
-import { api } from "@/lib/api";
 import type { User } from "@/types/auth";
 import { AuthContext, type AuthContextValue } from "./auth-context";
 import { setAuthFailureHandler } from "./auth-events";
@@ -17,19 +17,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [accessTokenState, setAccessTokenState] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [status, setStatus] = useState<AuthContextValue["status"]>("loading");
+  const hasFetched = useRef(false);
 
   const login = useCallback(async (email: string, password: string) => {
-    const response = await loginApi(email, password);
+    const loginResponse = await loginApi(email, password);
 
-    console.log(response);
-
-    setAccessToken(response?.data?.accessToken);
-    setAccessTokenState(response?.data?.accessToken);
-
-    const currentUser = await getCurrentUser();
-
-    setUser(currentUser);
-    setStatus("authenticated");
+    if (loginResponse.success && loginResponse?.payload) {
+      setAccessToken(loginResponse.payload.accessToken);
+      setAccessTokenState(loginResponse.payload.accessToken);
+      const currentUserRes = await getCurrentUser();
+      if (currentUserRes.success && currentUserRes.payload) {
+        setUser(currentUserRes.payload);
+        setStatus("authenticated");
+      }
+    }
   }, []);
 
   const logout = useCallback(async () => {
@@ -61,17 +62,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         // We don't need to manually call /refresh here.
         // We can use the API directly.
-        const response = await api.post<{ accessToken: string }>(
-          "/auth/refresh",
-        );
+        const refreshApiRes = await refreshAccessToken();
 
-        setAccessToken(response.data.accessToken);
-        setAccessTokenState(response.data.accessToken);
+        if (refreshApiRes?.payload && refreshApiRes.payload.accessToken) {
+          setAccessToken(refreshApiRes.payload.accessToken);
+          setAccessTokenState(refreshApiRes.payload.accessToken);
 
-        const currentUser = await getCurrentUser();
+          const currentUserRes = await getCurrentUser();
 
-        setUser(currentUser);
-        setStatus("authenticated");
+          if (currentUserRes.success && currentUserRes.payload) {
+            setUser(currentUserRes.payload);
+            setStatus("authenticated");
+          }
+        }
       } catch {
         setAccessToken(null);
         setAccessTokenState(null);
@@ -80,7 +83,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    if (hasFetched.current) return;
+    hasFetched.current = true;
     initialize();
+
+    // 3. Return a cleanup function to abort the request on unmount
   }, []);
 
   const value = useMemo(

@@ -1,19 +1,12 @@
 import { api } from "@/lib/api";
-import type { User } from "@/types/auth";
-
-interface LoginResponse {
-  accessToken: string;
-}
-
-interface RefreshResponse {
-  accessToken: string;
-}
+import type { ApiResponse } from "@/types/apiCommonResponse";
+import type { LoginResponse, RefreshApiResponse, User } from "@/types/auth";
 
 export async function login(
   email: string,
   password: string,
-): Promise<LoginResponse> {
-  const { data } = await api.post<LoginResponse>("/auth/login", {
+): Promise<ApiResponse<LoginResponse>> {
+  const { data } = await api.post<ApiResponse<LoginResponse>>("/auth/login", {
     email,
     password,
   });
@@ -21,15 +14,16 @@ export async function login(
   return data;
 }
 
-export async function refreshAccessToken(): Promise<string> {
-  const { data } = await api.post<RefreshResponse>("/auth/refresh");
-
-  return data.accessToken;
+export async function refreshAccessToken(): Promise<
+  ApiResponse<RefreshApiResponse>
+> {
+  const { data } =
+    await api.post<ApiResponse<RefreshApiResponse>>("/auth/refresh");
+  return data;
 }
 
-export async function getCurrentUser(): Promise<User> {
-  const { data } = await api.get<User>("/users/me");
-
+export async function getCurrentUser(): Promise<ApiResponse<User>> {
+  const { data } = await api.get<ApiResponse<User>>("/users/me");
   return data;
 }
 

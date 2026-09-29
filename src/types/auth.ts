@@ -1,10 +1,22 @@
 export interface User {
-  id: number;
-  name: string | null;
+  userId: number;
   email: string;
-  role: {
-    id: number;
+  role: "USER" | "ADMIN";
+}
+
+export interface RefreshApiResponse {
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface LoginResponse {
+  accessToken: string;
+  refreshToken: string;
+  user: {
+    id: string;
+    email: string;
     name: string;
+    role: "ADMIN" | "USER";
   };
 }
 

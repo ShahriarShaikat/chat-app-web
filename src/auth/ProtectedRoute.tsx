@@ -3,7 +3,8 @@ import type { JSX } from "react";
 import { Navigate } from "react-router-dom";
 
 export function ProtectedRoute({ children }: { children: JSX.Element }) {
-  const { status } = useAuth();
+  const { status, user } = useAuth();
+  console.log("🚀 ~ ProtectedRoute ~ user:", user);
 
   if (status === "loading") {
     return <div>Loading...</div>;
