@@ -2,6 +2,7 @@ import axios from "axios";
 
 import { getAccessToken, setAccessToken } from "@/auth/token-store";
 
+import { refreshAccessToken } from "@/auth/auth-api";
 import { notifyAuthFailure } from "@/auth/auth-events";
 
 export const api = axios.create({
@@ -25,16 +26,23 @@ let refreshPromise: Promise<string> | null = null;
 
 async function refresh() {
   if (!refreshPromise) {
-    refreshPromise = api
-      .post<{ accessToken: string }>("/auth/refresh")
-      .then(({ data }) => {
-        setAccessToken(data?.data.accessToken);
+    refreshPromise = (async () => {
+      try {
+        const refreshTokenRes = await refreshAccessToken();
 
-        return data?.data.accessToken;
-      })
-      .finally(() => {
-        refreshPromise = null;
-      });
+        if (refreshTokenRes.success && refreshTokenRes.payload) {
+          setAccessToken(refreshTokenRes.payload.accessToken);
+          return refreshTokenRes.payload.accessToken;
+        }
+
+        throw new Error("Failed to refresh access token");
+      } catch (error) {
+        console.log("🚀 ~ refresh ~ error:", error);
+        throw error;
+      }
+    })().finally(() => {
+      refreshPromise = null;
+    });
   }
 
   return refreshPromise;
@@ -59,15 +67,11 @@ api.interceptors.response.use(
 
     try {
       const token = await refresh();
-
       originalRequest.headers.Authorization = `Bearer ${token}`;
-
       return api(originalRequest);
     } catch (refreshError) {
       setAccessToken(null);
-
       notifyAuthFailure();
-
       return Promise.reject(refreshError);
     }
   },
