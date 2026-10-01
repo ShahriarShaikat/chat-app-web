@@ -8,7 +8,7 @@ export interface AuthContextValue {
 
   invokeLogin: (accessToken: string) => Promise<void>;
 
-  logout: () => Promise<void>;
+  invokeLogout: () => void;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);

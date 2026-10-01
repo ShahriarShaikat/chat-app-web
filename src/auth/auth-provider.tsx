@@ -1,10 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import {
-  getCurrentUser,
-  logout as logoutApi,
-  refreshAccessToken,
-} from "./auth-api";
+import { getCurrentUser, refreshAccessToken } from "./auth-api";
 
 import { setAccessToken } from "./token-store";
 
@@ -34,15 +30,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const logout = useCallback(async () => {
-    try {
-      await logoutApi();
-    } finally {
-      setAccessToken(null);
-      setAccessTokenState(null);
-      setUser(null);
-      setStatus("unauthenticated");
-    }
+  const invokeLogout = useCallback(() => {
+    // try {
+    //   await logoutApi();
+    // } finally {
+    setAccessToken(null);
+    setAccessTokenState(null);
+    setUser(null);
+    setStatus("unauthenticated");
+    // }
   }, []);
 
   useEffect(() => {
@@ -97,9 +93,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       status,
       invokeLogin,
-      logout,
+      invokeLogout,
     }),
-    [accessTokenState, user, status, invokeLogin, logout],
+    [accessTokenState, user, status, invokeLogin, invokeLogout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,4 +1,6 @@
+import { logout } from "@/auth/auth-api";
 import Logo from "@/components/Logo";
+import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import {
   Archive,
@@ -23,6 +25,7 @@ import {
   Video,
   X,
 } from "lucide-react";
+import { enqueueSnackbar } from "notistack";
 import { useState } from "react";
 
 const people = [
@@ -140,6 +143,38 @@ function Avatar({
 
 function ConversationList({ onNew }: { onNew: () => void }) {
   const [search, setSearch] = useState("");
+  const { invokeLogout } = useAuth();
+  const handleLogOut = async () => {
+    try {
+      const logoOutRes = await logout();
+      if (logoOutRes?.success && logoOutRes.payload) {
+        invokeLogout();
+        enqueueSnackbar(
+          logoOutRes.payload.message || "Logged out successfully",
+          {
+            anchorOrigin: { horizontal: "center", vertical: "bottom" },
+            autoHideDuration: 3000,
+            variant: "success",
+          },
+        );
+
+        // navigate("/chat");
+      } else {
+        enqueueSnackbar(logoOutRes.payload.message || "Failed to log out", {
+          anchorOrigin: { horizontal: "center", vertical: "bottom" },
+          autoHideDuration: 3000,
+          variant: "error",
+        });
+      }
+    } catch (error) {
+      console.log("🚀 ~ onSubmit ~ error:", error);
+      enqueueSnackbar("Failed to log out", {
+        anchorOrigin: { horizontal: "center", vertical: "bottom" },
+        autoHideDuration: 3000,
+        variant: "error",
+      });
+    }
+  };
   return (
     <aside className="flex w-full shrink-0 flex-col border-r border-border bg-card md:w-[300px] xl:w-[330px]">
       <div className="flex items-center justify-between p-5 pb-4">
@@ -233,7 +268,10 @@ function ConversationList({ onNew }: { onNew: () => void }) {
         <div className="flex w-full items-center gap-3 p-2 text-left">
           <Avatar initials="AM" color="bg-[#e5e2fb] text-[#6253d9]" size="sm" />
           <span className="flex-1 text-sm font-medium">Alex Morgan</span>
-          <button className="hover:bg-muted rounded-xl p-2 cursor-pointer">
+          <button
+            onClick={handleLogOut}
+            className="hover:bg-muted rounded-xl p-2 cursor-pointer"
+          >
             <LogOut className="size-4 text-muted-foreground" />
           </button>
         </div>

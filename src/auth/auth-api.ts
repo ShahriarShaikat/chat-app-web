@@ -27,6 +27,8 @@ export async function getCurrentUser(): Promise<ApiResponse<User>> {
   return data;
 }
 
-export async function logout({ refreshToken }: { refreshToken: string }) {
-  await api.post("/auth/logout");
+export async function logout(): Promise<ApiResponse<{ message: string }>> {
+  const { data } =
+    await api.post<ApiResponse<{ message: string }>>("/auth/logout");
+  return data;
 }
