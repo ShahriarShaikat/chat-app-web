@@ -8,6 +8,9 @@ import { notifyAuthFailure } from "@/auth/auth-events";
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
   withCredentials: true,
+  headers: {
+    "Content-Type": "application/json",
+  },
 });
 
 // Attach access token

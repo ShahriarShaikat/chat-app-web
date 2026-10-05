@@ -1,5 +1,6 @@
 import { logout } from "@/auth/auth-api";
 import Logo from "@/components/Logo";
+import { useConversations } from "@/features/conversations/use-conversations";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import {
@@ -175,8 +176,19 @@ function ConversationList({ onNew }: { onNew: () => void }) {
       });
     }
   };
+
+  const { data, isPending, isError } = useConversations({
+    page: 1,
+    limit: 20,
+    sortBy: "updatedAt",
+    sortOrder: "desc",
+  });
+  console.log("🚀 ~ ConversationList ~ isError:", isError);
+  console.log("🚀 ~ ConversationList ~ isPending:", isPending);
+  console.log("🚀 ~ ConversationList ~ data:", data?.payload.meta);
+
   return (
-    <aside className="flex w-full shrink-0 flex-col border-r border-border bg-card md:w-[300px] xl:w-[330px]">
+    <aside className="flex w-full shrink-0 flex-col border-r border-border bg-card md:w-75 xl:w-82.5">
       <div className="flex items-center justify-between p-5 pb-4">
         <Logo />
         <button className="icon-button" aria-label="Settings">
@@ -283,7 +295,7 @@ function ConversationList({ onNew }: { onNew: () => void }) {
 function MessageArea() {
   return (
     <section className="flex min-w-0 flex-1 flex-col bg-[#fbfbfd]">
-      <header className="flex h-[73px] items-center justify-between border-b border-border bg-card px-4 sm:px-6">
+      <header className="flex h-18.25 items-center justify-between border-b border-border bg-card px-4 sm:px-6">
         <div className="flex items-center gap-3">
           <button className="icon-button md:hidden">
             <ArrowLeft />
@@ -411,8 +423,8 @@ function MessageArea() {
 
 function DetailsPanel() {
   return (
-    <aside className="hidden w-[280px] shrink-0 border-l border-border bg-card xl:flex xl:flex-col">
-      <div className="flex h-[73px] items-center justify-between border-b border-border px-5">
+    <aside className="hidden w-70 shrink-0 border-l border-border bg-card xl:flex xl:flex-col">
+      <div className="flex h-18.25 items-center justify-between border-b border-border px-5">
         <h3 className="text-sm font-semibold">Conversation details</h3>
         <button className="icon-button">
           <X />
@@ -482,7 +494,7 @@ function NewConversation({ onClose }: { onClose: () => void }) {
   );
   return (
     <div className="absolute inset-0 z-20 flex items-end justify-center bg-foreground/20 p-0 backdrop-blur-[2px] sm:items-center sm:p-6">
-      <div className="flex h-full w-full max-w-lg flex-col bg-card shadow-2xl sm:h-auto sm:max-h-[720px] sm:rounded-2xl sm:border sm:border-border">
+      <div className="flex h-full w-full max-w-lg flex-col bg-card shadow-2xl sm:h-auto sm:max-h-180 sm:rounded-2xl sm:border sm:border-border">
         <header className="flex items-center justify-between border-b border-border p-5">
           <div>
             <h2 className="font-semibold">New conversation</h2>
