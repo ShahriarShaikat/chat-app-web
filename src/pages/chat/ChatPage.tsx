@@ -1,5 +1,6 @@
 import { logout } from "@/auth/auth-api";
 import Logo from "@/components/Logo";
+import { Spinner } from "@/components/ui/spinner";
 import { useConversations } from "@/features/conversations/use-conversations";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -27,7 +28,7 @@ import {
   X,
 } from "lucide-react";
 import { enqueueSnackbar } from "notistack";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const people = [
   {
@@ -145,6 +146,7 @@ function Avatar({
 function ConversationList({ onNew }: { onNew: () => void }) {
   const [search, setSearch] = useState("");
   const { invokeLogout } = useAuth();
+  const loadMoreRef = useRef<HTMLDivElement>(null);
   const handleLogOut = async () => {
     try {
       const logoOutRes = await logout();
@@ -177,15 +179,40 @@ function ConversationList({ onNew }: { onNew: () => void }) {
     }
   };
 
-  const { data, isPending, isError } = useConversations({
-    page: 1,
-    limit: 20,
-    sortBy: "updatedAt",
-    sortOrder: "desc",
-  });
-  console.log("🚀 ~ ConversationList ~ isError:", isError);
-  console.log("🚀 ~ ConversationList ~ isPending:", isPending);
-  console.log("🚀 ~ ConversationList ~ data:", data?.payload.meta);
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
+    useConversations({
+      search: "",
+      type: "DIRECT",
+      sortBy: "updatedAt",
+      sortOrder: "desc",
+      limit: 20,
+    });
+
+  useEffect(() => {
+    const element = loadMoreRef.current;
+
+    if (!element) return;
+    if (!hasNextPage) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          fetchNextPage();
+        }
+      },
+      {
+        threshold: 0.1,
+      },
+    );
+
+    observer.observe(element);
+
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage]);
+
+  const conversationsapi =
+    data?.pages.flatMap((page) => page.payload.data) ?? [];
+  console.log("🚀 ~ ConversationList ~ conversations:", conversationsapi);
 
   return (
     <aside className="flex w-full shrink-0 flex-col border-r border-border bg-card md:w-75 xl:w-82.5">
@@ -275,6 +302,18 @@ function ConversationList({ onNew }: { onNew: () => void }) {
               </div>
             </button>
           ))}
+
+        <div
+          ref={loadMoreRef}
+          className="w-full items-center justify-center flex bg-amber-500"
+        >
+          {isFetchingNextPage && <Spinner className="size-6" />}
+          {!hasNextPage && !isFetchingNextPage && (
+            <span className="text-sm text-muted-foreground">
+              Opps! No more conversations to load.
+            </span>
+          )}
+        </div>
       </div>
       <div className="border-t border-border p-3">
         <div className="flex w-full items-center gap-3 p-2 text-left">

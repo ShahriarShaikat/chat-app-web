@@ -6,6 +6,18 @@ export interface ConversationUser {
   email: string;
 }
 
+export interface PaginatedConversations {
+  data: Conversation[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
+}
+
 export interface Conversation {
   id: number;
   type: ConversationType;

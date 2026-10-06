@@ -5,19 +5,8 @@ import type {
   ConversationListParams,
   CreateDirectConversationDto,
   CreateGroupConversationDto,
+  PaginatedConversations,
 } from "@/types/conversation.types";
-
-export interface PaginatedConversations {
-  data: Conversation[];
-  meta: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-    hasNextPage: boolean;
-    hasPreviousPage: boolean;
-  };
-}
 
 export const getConversations = async (
   params: ConversationListParams,
