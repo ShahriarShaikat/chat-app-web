@@ -147,6 +147,7 @@ function ConversationList({ onNew }: { onNew: () => void }) {
   const [search, setSearch] = useState("");
   const { invokeLogout } = useAuth();
   const loadMoreRef = useRef<HTMLDivElement>(null);
+  const [showNoMoreMessage, setShowNoMoreMessage] = useState(false);
   const handleLogOut = async () => {
     try {
       const logoOutRes = await logout();
@@ -192,13 +193,20 @@ function ConversationList({ onNew }: { onNew: () => void }) {
     const element = loadMoreRef.current;
 
     if (!element) return;
-    if (!hasNextPage) return;
 
     const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          fetchNextPage();
+      async (entries) => {
+        if (!entries[0].isIntersecting) return;
+
+        if (isFetchingNextPage) return;
+
+        if (!hasNextPage) {
+          setShowNoMoreMessage(true);
+
+          return;
         }
+
+        await fetchNextPage();
       },
       {
         threshold: 0.1,
@@ -208,7 +216,17 @@ function ConversationList({ onNew }: { onNew: () => void }) {
     observer.observe(element);
 
     return () => observer.disconnect();
-  }, [fetchNextPage, hasNextPage]);
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+
+  useEffect(() => {
+    if (!showNoMoreMessage) return;
+
+    const timeout = setTimeout(() => {
+      setShowNoMoreMessage(false);
+    }, 5000);
+
+    return () => clearTimeout(timeout);
+  }, [showNoMoreMessage]);
 
   const conversationsapi =
     data?.pages.flatMap((page) => page.payload.data) ?? [];
@@ -305,12 +323,12 @@ function ConversationList({ onNew }: { onNew: () => void }) {
 
         <div
           ref={loadMoreRef}
-          className="w-full items-center justify-center flex bg-amber-500"
+          className="w-full items-center justify-center flex "
         >
-          {isFetchingNextPage && <Spinner className="size-6" />}
-          {!hasNextPage && !isFetchingNextPage && (
+          {isFetchingNextPage && <Spinner className="size-6 text-amber-300" />}
+          {showNoMoreMessage && (
             <span className="text-sm text-muted-foreground">
-              Opps! No more conversations to load.
+              Oops! No more conversations to load.
             </span>
           )}
         </div>
