@@ -6,6 +6,15 @@ export interface ConversationUser {
   email: string;
 }
 
+export interface Message {
+  id: number;
+  content: string;
+  conversationId: number;
+  senderId: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface PaginatedConversations {
   data: Conversation[];
   meta: {
@@ -26,6 +35,7 @@ export interface Conversation {
   updatedAt: string;
 
   members: ConversationMember[];
+  messages: Message[] | null;
 }
 
 export interface ConversationMember {

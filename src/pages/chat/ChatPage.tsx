@@ -145,7 +145,8 @@ function Avatar({
 
 function ConversationList({ onNew }: { onNew: () => void }) {
   const [search, setSearch] = useState("");
-  const { invokeLogout } = useAuth();
+  const { invokeLogout, accessToken } = useAuth();
+  console.log("🚀 ~ ConversationList ~ accessToken:", accessToken);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const [showNoMoreMessage, setShowNoMoreMessage] = useState(false);
   const handleLogOut = async () => {
@@ -230,7 +231,10 @@ function ConversationList({ onNew }: { onNew: () => void }) {
 
   const conversationsapi =
     data?.pages.flatMap((page) => page.payload.data) ?? [];
-  console.log("🚀 ~ ConversationList ~ conversations:", conversationsapi);
+  console.log(
+    "🚀 ~ ConversationList ~ conversations:",
+    conversationsapi[0]?.messages?.map((m) => m.content),
+  );
 
   return (
     <aside className="flex w-full shrink-0 flex-col border-r border-border bg-card md:w-75 xl:w-82.5">
