@@ -1,9 +1,14 @@
 import { logout } from "@/auth/auth-api";
 import Logo from "@/components/Logo";
 import { Spinner } from "@/components/ui/spinner";
-import { useConversations } from "@/features/conversations/use-conversations";
+import {
+  useConversation,
+  useConversations,
+} from "@/features/conversations/use-conversations";
+import { useMessages } from "@/features/messages/use-messages";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import type { Conversation } from "@/types/conversation.types";
 import {
   Archive,
   ArrowLeft,
@@ -61,52 +66,52 @@ const people = [
   },
 ];
 
-const conversations = [
-  {
-    name: "John Doe",
-    preview: "Hey, are you available?",
-    time: "10:32 AM",
-    initials: "JD",
-    color: "bg-amber-100 text-amber-800",
-    unread: 2,
-    online: true,
-  },
-  {
-    name: "Design Team",
-    preview: "Sarah shared a file",
-    time: "9:45 AM",
-    initials: "DT",
-    color: "bg-violet-100 text-violet-700",
-    unread: 0,
-    group: true,
-  },
-  {
-    name: "Sarah Ahmed",
-    preview: "That sounds perfect!",
-    time: "Yesterday",
-    initials: "SA",
-    color: "bg-rose-100 text-rose-700",
-    unread: 0,
-    online: true,
-  },
-  {
-    name: "Project Alpha",
-    preview: "You: Let’s ship it",
-    time: "Tuesday",
-    initials: "PA",
-    color: "bg-sky-100 text-sky-700",
-    unread: 0,
-    group: true,
-  },
-  {
-    name: "Michael Smith",
-    preview: "Thanks for the update",
-    time: "Monday",
-    initials: "MS",
-    color: "bg-emerald-100 text-emerald-700",
-    unread: 0,
-  },
-];
+// const conversations = [
+//   {
+//     name: "John Doe",
+//     preview: "Hey, are you available?",
+//     time: "10:32 AM",
+//     initials: "JD",
+//     color: "bg-amber-100 text-amber-800",
+//     unread: 2,
+//     online: true,
+//   },
+//   {
+//     name: "Design Team",
+//     preview: "Sarah shared a file",
+//     time: "9:45 AM",
+//     initials: "DT",
+//     color: "bg-violet-100 text-violet-700",
+//     unread: 0,
+//     group: true,
+//   },
+//   {
+//     name: "Sarah Ahmed",
+//     preview: "That sounds perfect!",
+//     time: "Yesterday",
+//     initials: "SA",
+//     color: "bg-rose-100 text-rose-700",
+//     unread: 0,
+//     online: true,
+//   },
+//   {
+//     name: "Project Alpha",
+//     preview: "You: Let’s ship it",
+//     time: "Tuesday",
+//     initials: "PA",
+//     color: "bg-sky-100 text-sky-700",
+//     unread: 0,
+//     group: true,
+//   },
+//   {
+//     name: "Michael Smith",
+//     preview: "Thanks for the update",
+//     time: "Monday",
+//     initials: "MS",
+//     color: "bg-emerald-100 text-emerald-700",
+//     unread: 0,
+//   },
+// ];
 
 function Avatar({
   initials,
@@ -143,10 +148,139 @@ function Avatar({
   );
 }
 
+function formatMessageTime(createdAt: string): string {
+  const messageDate = new Date(createdAt);
+  const now = new Date();
+
+  // Handle invalid dates
+  if (Number.isNaN(messageDate.getTime())) {
+    return "";
+  }
+
+  const isSameDay =
+    messageDate.getFullYear() === now.getFullYear() &&
+    messageDate.getMonth() === now.getMonth() &&
+    messageDate.getDate() === now.getDate();
+
+  if (isSameDay) {
+    // Example: 10:32 AM
+    return messageDate.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  }
+
+  // Start of today and yesterday
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  if (messageDate >= yesterday && messageDate < today) {
+    return "Yesterday";
+  }
+
+  // Example: Tuesday (within the last 7 days)
+  const sevenDaysAgo = new Date(today);
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+
+  if (messageDate >= sevenDaysAgo && messageDate < yesterday) {
+    return messageDate.toLocaleDateString("en-US", {
+      weekday: "long",
+    });
+  }
+
+  // Older messages: Oct 5 or Oct 5, 2025
+  const includeYear = messageDate.getFullYear() !== now.getFullYear();
+
+  return messageDate.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    ...(includeYear && { year: "numeric" }),
+  });
+}
+
+const getInitials = (conversationName: string) => {
+  const words = conversationName.trim().split(/\s+/).filter(Boolean);
+
+  if (words.length === 0) return "N/A";
+
+  if (words.length === 1) {
+    return words[0].slice(0, 2).toUpperCase();
+  }
+
+  return words
+    .slice(0, 2)
+    .map((word) => word.charAt(0))
+    .join("")
+    .toUpperCase();
+};
+
+function ConversationCard({
+  conversation,
+  isActive,
+}: {
+  conversation: Conversation;
+  isActive: boolean;
+}) {
+  const { user, setSelectedConversationId } = useAuth();
+
+  const conversationName = conversation?.name
+    ? conversation.name
+    : conversation.members.find((m) =>
+        user?.userId !== m.user.id ? m.user.name : "",
+      )?.user.name || "N/A";
+
+  return (
+    <button
+      onClick={() => setSelectedConversationId(conversation.id)}
+      className={cn(
+        "flex w-full items-center gap-3 rounded-xl p-3 text-left transition hover:bg-muted/70",
+        isActive && "bg-[#f0effd]",
+      )}
+    >
+      <div className="relative">
+        <Avatar
+          initials={getInitials(conversationName)}
+          color={"bg-sky-100 text-sky-700"}
+          online={true}
+          size="md"
+        />
+        {conversation.type === "GROUP" && (
+          <span className="absolute -bottom-1 -right-1 rounded bg-card p-0.5">
+            <Users className="size-3 text-muted-foreground" />
+          </span>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-2">
+          <span className="truncate text-sm font-semibold">
+            {conversationName}
+          </span>
+          <span className="shrink-0 text-[10px] text-muted-foreground">
+            {formatMessageTime(conversation?.messages?.[0]?.createdAt || "N/A")}
+          </span>
+        </div>
+        <div className="mt-1 flex items-center justify-between gap-2">
+          <span className="truncate text-xs text-muted-foreground">
+            {`${conversation?.messages?.[0]?.senderId === user?.userId ? "You: " : ""}${conversation?.messages?.[0]?.content || "No messages yet"}`}
+          </span>
+          {/* {c.unread > 0 && (
+            <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[#6253d9] text-[10px] font-semibold text-white">
+              {c.unread}
+            </span>
+          )} */}
+        </div>
+      </div>
+    </button>
+  );
+}
+
 function ConversationList({ onNew }: { onNew: () => void }) {
   const [search, setSearch] = useState("");
-  const { invokeLogout, accessToken } = useAuth();
-  console.log("🚀 ~ ConversationList ~ accessToken:", accessToken);
+  const { invokeLogout, selectedConversationId } = useAuth();
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const [showNoMoreMessage, setShowNoMoreMessage] = useState(false);
   const handleLogOut = async () => {
@@ -229,12 +363,9 @@ function ConversationList({ onNew }: { onNew: () => void }) {
     return () => clearTimeout(timeout);
   }, [showNoMoreMessage]);
 
-  const conversationsapi =
+  const conversationListData =
     data?.pages.flatMap((page) => page.payload.data) ?? [];
-  console.log(
-    "🚀 ~ ConversationList ~ conversations:",
-    conversationsapi[0]?.messages?.map((m) => m.content),
-  );
+  console.log("🚀 ~ ConversationList ~ conversations:", conversationListData);
 
   return (
     <aside className="flex w-full shrink-0 flex-col border-r border-border bg-card md:w-75 xl:w-82.5">
@@ -279,7 +410,19 @@ function ConversationList({ onNew }: { onNew: () => void }) {
         </div>
       </div>
       <div className="mt-4 flex-1 overflow-y-auto px-2">
-        {conversations
+        {isLoading && (
+          <div className="flex h-full items-center justify-center">
+            <Spinner className="size-6 text-amber-300" />
+          </div>
+        )}
+        {conversationListData.map((conversation) => (
+          <ConversationCard
+            key={conversation.id}
+            conversation={conversation}
+            isActive={selectedConversationId === conversation.id}
+          />
+        ))}
+        {/* {conversations
           .filter((c) => c.name.toLowerCase().includes(search.toLowerCase()))
           .map((c, i) => (
             <button
@@ -323,7 +466,7 @@ function ConversationList({ onNew }: { onNew: () => void }) {
                 </div>
               </div>
             </button>
-          ))}
+          ))} */}
 
         <div
           ref={loadMoreRef}
@@ -353,131 +496,261 @@ function ConversationList({ onNew }: { onNew: () => void }) {
   );
 }
 
+function MessageItem() {
+  return (
+    <div className="flex items-end gap-2">
+      <Avatar initials="JD" color="bg-amber-100 text-amber-800" size="sm" />
+      <div>
+        <p className="mb-1 text-[11px] text-muted-foreground">
+          John Doe · 10:30 AM
+        </p>
+        <div className="max-w-md rounded-2xl rounded-bl-md bg-card px-4 py-3 text-sm leading-6 shadow-sm ring-1 ring-border/70">
+          Hey Alex, how are you doing? Are we still on for the design review
+          later?
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MessageArea() {
+  const { selectedConversationId, user } = useAuth();
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const [showNoMoreMessage, setShowNoMoreMessage] = useState(false);
+  const { data, isLoading } = useConversation(selectedConversationId);
+  console.log("🚀 ~ MessageArea ~ data:", data);
+
+  const conversationName = data?.payload?.name
+    ? data.payload.name
+    : data?.payload?.members.find((m) =>
+        user?.userId !== m.user.id ? m.user.name : "",
+      )?.user.name || "N/A";
+
+  const {
+    data: messagesData,
+    isPending,
+    isError,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useMessages(selectedConversationId);
+
+  const messages = messagesData?.pages
+    ? (messagesData.pages.flatMap((page) => page.payload.data) ?? [])
+    : [];
+  console.log(
+    "🚀 ~ MessageArea ~ messages:",
+    messages.map((m) => m.content),
+  );
+
+  useEffect(() => {
+    const element = loadMoreRef.current;
+
+    if (!element) return;
+
+    const observer = new IntersectionObserver(
+      async (entries) => {
+        if (!entries[0].isIntersecting) return;
+
+        if (isFetchingNextPage) return;
+
+        if (!hasNextPage) {
+          setShowNoMoreMessage(true);
+
+          return;
+        }
+
+        await fetchNextPage();
+      },
+      {
+        threshold: 0.1,
+      },
+    );
+
+    observer.observe(element);
+
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+
+  useEffect(() => {
+    if (!showNoMoreMessage) return;
+
+    const timeout = setTimeout(() => {
+      setShowNoMoreMessage(false);
+    }, 5000);
+
+    return () => clearTimeout(timeout);
+  }, [showNoMoreMessage]);
+
   return (
     <section className="flex min-w-0 flex-1 flex-col bg-[#fbfbfd]">
-      <header className="flex h-18.25 items-center justify-between border-b border-border bg-card px-4 sm:px-6">
-        <div className="flex items-center gap-3">
-          <button className="icon-button md:hidden">
-            <ArrowLeft />
-          </button>
-          <Avatar initials="JD" color="bg-amber-100 text-amber-800" online />
-          <div>
-            <h2 className="text-sm font-semibold">John Doe</h2>
-            <p className="text-xs text-emerald-600">Active now</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-1">
-          <button className="icon-button hidden sm:flex">
-            <Phone />
-          </button>
-          <button className="icon-button hidden sm:flex">
-            <Video />
-          </button>
-          <button className="icon-button">
-            <Search />
-          </button>
-          <button className="icon-button">
-            <MoreHorizontal />
-          </button>
-        </div>
-      </header>
-      <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-8">
-        <div className="mx-auto flex max-w-3xl flex-col gap-5">
-          <div className="flex justify-center">
-            <span className="rounded-full bg-muted px-3 py-1 text-[10px] font-medium text-muted-foreground">
-              Today
-            </span>
-          </div>
-          <div className="flex items-end gap-2">
-            <Avatar
-              initials="JD"
-              color="bg-amber-100 text-amber-800"
-              size="sm"
-            />
-            <div>
-              <p className="mb-1 text-[11px] text-muted-foreground">
-                John Doe · 10:30 AM
-              </p>
-              <div className="max-w-md rounded-2xl rounded-bl-md bg-card px-4 py-3 text-sm leading-6 shadow-sm ring-1 ring-border/70">
-                Hey Alex, how are you doing? Are we still on for the design
-                review later?
+      {selectedConversationId ? (
+        <>
+          <header className="flex h-18.25 items-center justify-between border-b border-border bg-card px-4 sm:px-6">
+            <div className="flex items-center gap-3">
+              <button className="icon-button md:hidden">
+                <ArrowLeft />
+              </button>
+              <Avatar
+                initials={getInitials(conversationName)}
+                color="bg-amber-100 text-amber-800"
+                online
+              />
+              <div>
+                <h2 className="text-sm font-semibold">{conversationName}</h2>
+                <p className="text-xs text-emerald-600">Active now</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <button className="icon-button hidden sm:flex">
+                <Phone />
+              </button>
+              <button className="icon-button hidden sm:flex">
+                <Video />
+              </button>
+              <button className="icon-button">
+                <Search />
+              </button>
+              <button className="icon-button">
+                <MoreHorizontal />
+              </button>
+            </div>
+          </header>
+
+          {/* content */}
+          <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-8">
+            <div className="mx-auto flex max-w-3xl flex-col gap-5">
+              <div
+                ref={loadMoreRef}
+                className="w-full items-center justify-center flex "
+              >
+                {isFetchingNextPage && (
+                  <Spinner className="size-6 text-amber-300" />
+                )}
+                {showNoMoreMessage && (
+                  <span className="text-sm text-muted-foreground">
+                    Oops! No more conversations to load.
+                  </span>
+                )}
+              </div>
+              <div className="flex justify-center">
+                <span className="rounded-full bg-muted px-3 py-1 text-[10px] font-medium text-muted-foreground">
+                  Today
+                </span>
+              </div>
+              {/* <div className="flex items-end gap-2">
+                <Avatar
+                  initials="JD"
+                  color="bg-amber-100 text-amber-800"
+                  size="sm"
+                />
+                <div>
+                  <p className="mb-1 text-[11px] text-muted-foreground">
+                    John Doe · 10:30 AM
+                  </p>
+                  <div className="max-w-md rounded-2xl rounded-bl-md bg-card px-4 py-3 text-sm leading-6 shadow-sm ring-1 ring-border/70">
+                    Hey Alex, how are you doing? Are we still on for the design
+                    review later?
+                  </div>
+                </div>
+              </div> */}
+              <MessageItem />
+              <MessageItem />
+              <MessageItem />
+              <MessageItem />
+              <MessageItem />
+              <MessageItem />
+              <MessageItem />
+              <MessageItem />
+              <MessageItem />
+              <div className="flex flex-col items-end gap-1">
+                <div className="max-w-md rounded-2xl rounded-br-md bg-[#6253d9] px-4 py-3 text-sm leading-6 text-white">
+                  Hey! I&apos;m doing great, thanks. Absolutely, I&apos;ve got
+                  the latest screens ready to walk through.
+                </div>
+                <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                  10:31 AM <CheckCheck className="size-3 text-[#6253d9]" />
+                </span>
+              </div>
+              <div className="flex items-end gap-2">
+                <Avatar
+                  initials="JD"
+                  color="bg-amber-100 text-amber-800"
+                  size="sm"
+                />
+                <div>
+                  <p className="mb-1 text-[11px] text-muted-foreground">
+                    John Doe · 10:32 AM
+                  </p>
+                  <div className="max-w-md rounded-2xl rounded-bl-md bg-card px-4 py-3 text-sm leading-6 shadow-sm ring-1 ring-border/70">
+                    Perfect. I&apos;ll send over the notes beforehand. See you
+                    then!
+                  </div>
+                </div>
+              </div>
+              <div className="my-2 flex items-center gap-3">
+                <div className="h-px flex-1 bg-[#d9d6f6]" />
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[#6253d9]">
+                  Unread
+                </span>
+                <div className="h-px flex-1 bg-[#d9d6f6]" />
+              </div>
+              <div className="flex flex-col items-end gap-1">
+                <div className="max-w-md rounded-2xl rounded-br-md bg-[#6253d9] px-4 py-3 text-sm leading-6 text-white">
+                  Sounds good. Looking forward to it.
+                </div>
+                <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                  Just now <Check className="size-3" />
+                </span>
+              </div>
+              <div className="flex items-center gap-2 px-12 text-xs text-muted-foreground">
+                <span className="flex gap-1">
+                  <i className="size-1.5 animate-bounce rounded-full bg-muted-foreground" />
+                  <i className="size-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:120ms]" />
+                  <i className="size-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:240ms]" />
+                </span>{" "}
+                John is typing
               </div>
             </div>
           </div>
-          <div className="flex flex-col items-end gap-1">
-            <div className="max-w-md rounded-2xl rounded-br-md bg-[#6253d9] px-4 py-3 text-sm leading-6 text-white">
-              Hey! I&apos;m doing great, thanks. Absolutely, I&apos;ve got the
-              latest screens ready to walk through.
+          <div className="border-t border-border bg-card p-4 sm:px-6">
+            <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-2xl border border-border bg-muted/50 p-2">
+              <button className="icon-button">
+                <Paperclip />
+              </button>
+              <textarea
+                rows={1}
+                placeholder="Write a message..."
+                className="max-h-24 min-h-9 flex-1 resize-none bg-transparent px-1 py-2 text-sm outline-none placeholder:text-muted-foreground"
+              />
+              <button className="icon-button hidden sm:flex">
+                <Smile />
+              </button>
+              <button
+                className="flex size-9 items-center justify-center rounded-xl bg-[#6253d9] text-white transition hover:bg-[#5143c8]"
+                aria-label="Send message"
+              >
+                <Send className="size-4" />
+              </button>
             </div>
-            <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-              10:31 AM <CheckCheck className="size-3 text-[#6253d9]" />
-            </span>
+            <p className="mx-auto mt-2 max-w-3xl text-[10px] text-muted-foreground">
+              Press Enter to send · Shift + Enter for a new line
+            </p>
           </div>
-          <div className="flex items-end gap-2">
-            <Avatar
-              initials="JD"
-              color="bg-amber-100 text-amber-800"
-              size="sm"
-            />
-            <div>
-              <p className="mb-1 text-[11px] text-muted-foreground">
-                John Doe · 10:32 AM
-              </p>
-              <div className="max-w-md rounded-2xl rounded-bl-md bg-card px-4 py-3 text-sm leading-6 shadow-sm ring-1 ring-border/70">
-                Perfect. I&apos;ll send over the notes beforehand. See you then!
-              </div>
-            </div>
-          </div>
-          <div className="my-2 flex items-center gap-3">
-            <div className="h-px flex-1 bg-[#d9d6f6]" />
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-[#6253d9]">
-              Unread
-            </span>
-            <div className="h-px flex-1 bg-[#d9d6f6]" />
-          </div>
-          <div className="flex flex-col items-end gap-1">
-            <div className="max-w-md rounded-2xl rounded-br-md bg-[#6253d9] px-4 py-3 text-sm leading-6 text-white">
-              Sounds good. Looking forward to it.
-            </div>
-            <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-              Just now <Check className="size-3" />
-            </span>
-          </div>
-          <div className="flex items-center gap-2 px-12 text-xs text-muted-foreground">
-            <span className="flex gap-1">
-              <i className="size-1.5 animate-bounce rounded-full bg-muted-foreground" />
-              <i className="size-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:120ms]" />
-              <i className="size-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:240ms]" />
-            </span>{" "}
-            John is typing
-          </div>
-        </div>
-      </div>
-      <div className="border-t border-border bg-card p-4 sm:px-6">
-        <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-2xl border border-border bg-muted/50 p-2">
-          <button className="icon-button">
-            <Paperclip />
-          </button>
-          <textarea
-            rows={1}
-            placeholder="Write a message..."
-            className="max-h-24 min-h-9 flex-1 resize-none bg-transparent px-1 py-2 text-sm outline-none placeholder:text-muted-foreground"
+        </>
+      ) : (
+        <div className="w-full flex h-full flex-col gap-4 items-center justify-center border">
+          <img
+            src="/images/no-messages-illustration-svg-download-png-6430768.webp"
+            alt="No conversation selected"
+            className="w-1/3"
           />
-          <button className="icon-button hidden sm:flex">
-            <Smile />
-          </button>
-          <button
-            className="flex size-9 items-center justify-center rounded-xl bg-[#6253d9] text-white transition hover:bg-[#5143c8]"
-            aria-label="Send message"
-          >
-            <Send className="size-4" />
-          </button>
+          <div className="text-[#6253d9] px-4 py-3 text-xl font-semibold leading-6">
+            No conversation selected. Please select a conversation from the list
+            or start a new one.
+          </div>
         </div>
-        <p className="mx-auto mt-2 max-w-3xl text-[10px] text-muted-foreground">
-          Press Enter to send · Shift + Enter for a new line
-        </p>
-      </div>
+      )}
     </section>
   );
 }

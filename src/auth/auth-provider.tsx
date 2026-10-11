@@ -12,6 +12,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [accessTokenState, setAccessTokenState] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [status, setStatus] = useState<AuthContextValue["status"]>("loading");
+  const [selectedConversationId, setSelectedConversationId] = useState<
+    number | null
+  >(null);
   const hasFetched = useRef(false);
 
   const invokeLogin = useCallback(async (accessToken: string) => {
@@ -94,8 +97,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       status,
       invokeLogin,
       invokeLogout,
+      selectedConversationId,
+      setSelectedConversationId,
     }),
-    [accessTokenState, user, status, invokeLogin, invokeLogout],
+    [
+      accessTokenState,
+      user,
+      status,
+      invokeLogin,
+      invokeLogout,
+      selectedConversationId,
+      setSelectedConversationId,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

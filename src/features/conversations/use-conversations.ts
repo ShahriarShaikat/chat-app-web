@@ -1,6 +1,6 @@
 import type { ConversationListParams } from "@/types/conversation.types";
-import { useInfiniteQuery } from "@tanstack/react-query";
-import { getConversations } from "./conversation-api";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { getConversation, getConversations } from "./conversation-api";
 import { conversationKeys } from "./conversation-keys";
 
 // export const useConversations = (params: ConversationListParams = {}) => {
@@ -35,5 +35,18 @@ export const useConversations = (params: ConversationListParams = {}) => {
 
       return lastPage.payload.meta.page + 1;
     },
+  });
+};
+
+export const useConversation = (conversationId: number | null) => {
+  return useQuery({
+    queryKey: conversationKeys.detail(conversationId!),
+    queryFn: () => {
+      if (conversationId === null) {
+        throw new Error("Conversation ID is required");
+      }
+      return getConversation(conversationId!);
+    },
+    enabled: !!conversationId,
   });
 };
