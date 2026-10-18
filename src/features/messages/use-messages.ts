@@ -1,6 +1,10 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { messageKeys } from "./message-keys";
-import { getMessages } from "./messages-api";
+import { getMessages, sendMessage } from "./messages-api";
 
 export function useMessages(conversationId: number | null) {
   return useInfiniteQuery({
@@ -25,5 +29,31 @@ export function useMessages(conversationId: number | null) {
         : undefined,
 
     enabled: conversationId !== null,
+  });
+}
+
+export function useSendMessage() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      conversationId,
+      payload,
+    }: {
+      conversationId: number;
+      payload: { content: string };
+    }) => sendMessage(conversationId, payload),
+
+    onSuccess: async (_message, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: messageKeys.conversation(variables.conversationId),
+      });
+
+      // Refresh conversation previews, including last-message content
+      // and ordering in the sidebar.
+      await queryClient.invalidateQueries({
+        queryKey: ["conversations", "list"],
+      });
+    },
   });
 }

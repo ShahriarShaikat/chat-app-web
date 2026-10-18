@@ -1,10 +1,22 @@
 import { api } from "@/lib/api";
 import type { ApiResponse } from "@/types/apiCommonResponse";
-import type { MessagesResponse } from "@/types/message.types";
+import type { Message, MessagesResponse } from "@/types/message.types";
 
 interface GetMessagesParams {
   conversationId: number;
   cursor?: string;
+}
+
+export async function sendMessage(
+  conversationId: number,
+  body: { content: string },
+): Promise<Message> {
+  const response = await api.post(
+    `/conversations/${conversationId}/messages`,
+    body,
+  );
+
+  return response.data;
 }
 
 export async function getMessages({
@@ -14,6 +26,7 @@ export async function getMessages({
   const response = await api.get(`/conversations/${conversationId}/messages`, {
     params: {
       cursor,
+      limit: 10,
     },
   });
 
