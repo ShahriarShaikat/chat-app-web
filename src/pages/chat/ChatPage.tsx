@@ -536,28 +536,36 @@ function MessageItem({
 function MessageArea() {
   const { selectedConversationId, user } = useAuth();
   const [messageInput, setMessageInput] = useState("");
+  const [showNoMoreMessage, setShowNoMoreMessage] = useState<boolean>(false);
+
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [showNoMoreMessage, setShowNoMoreMessage] = useState(false);
-  const { data, isLoading } = useConversation(selectedConversationId);
-  // console.log("🚀 ~ MessageArea ~ data:", data);
 
-  const conversationName = data?.payload?.name
-    ? data.payload.name
-    : data?.payload?.members.find((m) =>
-        user?.userId !== m.user.id ? m.user.name : "",
-      )?.user.name || "N/A";
+  const { data } = useConversation(selectedConversationId);
+
+  const conversationName =
+    data?.payload?.name ||
+    data?.payload?.members.find((m) => m.user.id !== user?.userId)?.user.name ||
+    "N/A";
 
   const {
     data: messagesData,
-    isPending,
-    isError,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
   } = useMessages(selectedConversationId);
 
   const sendMessageMutation = useSendMessage();
+
+  // Pages are newest-first; each new page holds older messages.
+  // With column-reverse, index 0 (newest) renders at the bottom.
+  const messages =
+    messagesData?.pages.flatMap((page) => page.payload.data) ?? [];
+
+  const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
+    // In a column-reverse scroll container, scrollTop 0 is the bottom
+    scrollContainerRef.current?.scrollTo({ top: 0, behavior });
+  };
 
   const handleSendMessage = () => {
     const content = messageInput.trim();
@@ -574,6 +582,7 @@ function MessageArea() {
       {
         onSuccess: () => {
           setMessageInput("");
+          scrollToBottom("smooth");
         },
         onError: () => {
           enqueueSnackbar("Failed to send message. Please try again.", {
@@ -597,18 +606,14 @@ function MessageArea() {
     }
   };
 
-  const messages = messagesData?.pages
-    ? (messagesData.pages.flatMap((page) => page.payload.data) ?? [])
-    : [];
-
+  // Jump to the latest message when the conversation changes
   useEffect(() => {
-    const container = scrollContainerRef.current;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setShowNoMoreMessage(false);
+    scrollToBottom();
+  }, [selectedConversationId]);
 
-    if (!container || !messages.length) return;
-
-    container.scrollTop = 0;
-  }, [selectedConversationId, messages.length]);
-
+  // Load older messages when the top sentinel comes into view
   useEffect(() => {
     const element = loadMoreRef.current;
     const container = scrollContainerRef.current;
@@ -619,20 +624,18 @@ function MessageArea() {
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (!entry.isIntersecting) return;
+        if (!entry.isIntersecting || isFetchingNextPage) return;
 
-        // Don't automatically paginate if the content doesn't overflow.
-        const isScrollable = container.scrollHeight > container.clientHeight;
-
-        if (!isScrollable) return;
-
-        if (isFetchingNextPage || !hasNextPage) return;
-
-        fetchNextPage();
+        if (hasNextPage) {
+          fetchNextPage();
+        } else if (container.scrollHeight > container.clientHeight) {
+          // Only show when the user actually scrolled up to the end
+          setShowNoMoreMessage(true);
+        }
       },
       {
         root: container,
-        threshold: 0.1,
+        rootMargin: "200px 0px 0px 0px", // start loading a bit before the top
       },
     );
 
@@ -641,6 +644,7 @@ function MessageArea() {
     return () => observer.disconnect();
   }, [selectedConversationId, fetchNextPage, hasNextPage, isFetchingNextPage]);
 
+  // Hide the "no more messages" notice after 5s
   useEffect(() => {
     if (!showNoMoreMessage) return;
 
@@ -686,15 +690,24 @@ function MessageArea() {
             </div>
           </header>
 
-          {/* content */}
+          {/* Content: column-reverse so the scroll starts at the bottom */}
           <div
             ref={scrollContainerRef}
-            className="flex-1 overflow-y-auto px-4 py-6 sm:px-8"
+            className="flex min-h-0 flex-1 flex-col-reverse overflow-y-auto px-4 py-6 sm:px-8"
           >
-            <div className="mx-auto flex max-w-3xl flex-col gap-5">
+            <div className="mx-auto flex w-full max-w-3xl flex-col-reverse gap-5">
+              {messages.map((message) => (
+                <MessageItem
+                  key={message.id}
+                  type={message.sender.id === user?.userId ? "me" : "others"}
+                  message={message}
+                />
+              ))}
+
+              {/* Last in the DOM = shown at the top */}
               <div
                 ref={loadMoreRef}
-                className="w-full items-center justify-center flex "
+                className="flex min-h-px w-full items-center justify-center"
               >
                 {isFetchingNextPage && (
                   <Spinner className="size-6 text-amber-300" />
@@ -705,17 +718,9 @@ function MessageArea() {
                   </span>
                 )}
               </div>
-              <div className="flex flex-col-reverse gap-5">
-                {messages.map((message) => (
-                  <MessageItem
-                    key={message.id}
-                    type={message.sender.id === user?.userId ? "me" : "others"}
-                    message={message}
-                  />
-                ))}
-              </div>
             </div>
           </div>
+
           <div className="border-t border-border bg-card p-4 sm:px-6">
             <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-2xl border border-border bg-muted/50 p-2">
               <button className="icon-button">
@@ -736,7 +741,8 @@ function MessageArea() {
               <button
                 type="button"
                 onClick={handleSendMessage}
-                className="flex size-9 cursor-pointer items-center justify-center rounded-xl bg-[#6253d9] text-white transition hover:bg-[#5143c8]"
+                disabled={sendMessageMutation.isPending}
+                className="flex size-9 cursor-pointer items-center justify-center rounded-xl bg-[#6253d9] text-white transition hover:bg-[#5143c8] disabled:cursor-not-allowed disabled:opacity-60"
                 aria-label="Send message"
               >
                 <Send className="size-4" />
@@ -748,13 +754,13 @@ function MessageArea() {
           </div>
         </>
       ) : (
-        <div className="w-full flex h-full flex-col gap-4 items-center justify-center border">
+        <div className="flex h-full w-full flex-col items-center justify-center gap-4 border">
           <img
             src="/images/no-messages-illustration-svg-download-png-6430768.webp"
             alt="No conversation selected"
             className="w-1/3"
           />
-          <div className="text-[#6253d9] px-4 py-3 text-xl font-semibold leading-6">
+          <div className="px-4 py-3 text-xl font-semibold leading-6 text-[#6253d9]">
             No conversation selected. Please select a conversation from the list
             or start a new one.
           </div>
