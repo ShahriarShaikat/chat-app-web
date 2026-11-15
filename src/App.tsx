@@ -2,6 +2,7 @@ import AppRoutes from "@/routes/AppRoutes";
 import { SnackbarProvider } from "notistack";
 import { useEffect } from "react";
 import { AuthProvider } from "./auth/auth-provider";
+import { ChatSocketConnection } from "./features/ChatSocketConnection";
 
 function App() {
   useEffect(() => {
@@ -33,6 +34,7 @@ function App() {
 
   return (
     <AuthProvider>
+      <ChatSocketConnection />
       <AppRoutes />
       <SnackbarProvider />
     </AuthProvider>

@@ -5,7 +5,11 @@ import {
   useConversation,
   useConversations,
 } from "@/features/conversations/use-conversations";
-import { useMessages, useSendMessage } from "@/features/messages/use-messages";
+import {
+  useMessages,
+  useRealtimeMessages,
+  useSendMessage,
+} from "@/features/messages/use-messages";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import type { Conversation } from "@/types/conversation.types";
@@ -554,6 +558,8 @@ function MessageArea() {
     hasNextPage,
     isFetchingNextPage,
   } = useMessages(selectedConversationId);
+
+  useRealtimeMessages(selectedConversationId);
 
   const sendMessageMutation = useSendMessage();
 
