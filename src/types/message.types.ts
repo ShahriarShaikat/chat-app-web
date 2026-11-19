@@ -1,5 +1,6 @@
 export interface Message {
   id: number;
+  conversationId: number;
   createdAt: string;
   updatedAt: string;
   content: string;

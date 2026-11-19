@@ -1,12 +1,14 @@
 import { socket } from "@/lib/socket";
+import type { ApiResponse } from "@/types/apiCommonResponse";
+import type { Message, MessagesResponse } from "@/types/message.types";
 import {
   useInfiniteQuery,
   useMutation,
   useQueryClient,
+  type InfiniteData,
 } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { messageKeys } from "./message-keys";
-import type { Message } from "./message.types";
 import { getMessages, sendMessage } from "./messages-api";
 
 export function useRealtimeMessages(conversationId: number | null) {
@@ -20,55 +22,49 @@ export function useRealtimeMessages(conversationId: number | null) {
     };
 
     const handleNewMessage = (message: Message) => {
-      console.log("🚀 ~ handleNewMessage ~ message:", message);
       // Ignore messages from other conversations.
       if (message.conversationId !== conversationId) return;
 
-      // queryClient.setQueryData<
-      //   InfiniteData<MessagesPage, string | undefined>
-      // >(
-      //   messageKeys.conversation(conversationId),
-      //   (oldData) => {
-      //     // If messages haven't loaded yet, fetch them normally.
-      //     if (!oldData?.pages.length) {
-      //       queryClient.invalidateQueries({
-      //         queryKey: messageKeys.conversation(conversationId),
-      //       });
+      queryClient.setQueryData<
+        InfiniteData<ApiResponse<MessagesResponse>, string | undefined>
+      >(messageKeys.conversation(conversationId), (oldData) => {
+        // If messages haven't loaded yet, fetch them normally.
+        if (!oldData?.pages.length) {
+          queryClient.invalidateQueries({
+            queryKey: messageKeys.conversation(conversationId),
+          });
 
-      //       return oldData;
-      //     }
+          return oldData;
+        }
 
-      //     // Prevent duplicate messages.
-      //     const alreadyExists = oldData.pages.some((page) =>
-      //       page.payload.data.some(
-      //         (item) => item.id === message.id,
-      //       ),
-      //     );
+        // Prevent duplicate messages.
+        const alreadyExists = oldData.pages.some((page) =>
+          page.payload.data.some((item) => item.id === message.id),
+        );
 
-      //     if (alreadyExists) return oldData;
+        if (alreadyExists) return oldData;
 
-      //     // First page contains the newest messages.
-      //     const pages = [...oldData.pages];
+        // First page contains the newest messages.
+        const pages = [...oldData.pages];
 
-      //     pages[0] = {
-      //       ...pages[0],
-      //       payload: {
-      //         ...pages[0].payload,
-      //         data: [message, ...pages[0].payload.data],
-      //       },
-      //     };
+        pages[0] = {
+          ...pages[0],
+          payload: {
+            ...pages[0].payload,
+            data: [message, ...pages[0].payload.data],
+          },
+        };
 
-      //     return {
-      //       ...oldData,
-      //       pages,
-      //     };
-      //   },
-      // );
+        return {
+          ...oldData,
+          pages,
+        };
+      });
 
-      // // Refresh the conversation sidebar.
-      // queryClient.invalidateQueries({
-      //   queryKey: ["conversations", "list"],
-      // });
+      // Refresh the conversation sidebar.
+      queryClient.invalidateQueries({
+        queryKey: ["conversations", "list"],
+      });
     };
 
     // Join when connected, and rejoin after reconnection.
