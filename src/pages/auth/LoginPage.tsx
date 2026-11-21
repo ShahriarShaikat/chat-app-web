@@ -72,14 +72,9 @@ export default function LoginPage() {
     }
   };
 
-  // const handleSubmit = () => {
-  //   if (email && password) {
-  //     login(email, password);
-  //     navigate("/chat", {
-  //       replace: true,
-  //     });
-  //   }
-  // };
+  const handleGoogleLogin = () => {
+    window.location.assign(`${import.meta.env.VITE_API_URL}/auth/google/login`);
+  };
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#f8f8fc] px-4 py-10">
@@ -117,60 +112,66 @@ export default function LoginPage() {
                   : "Sign in to continue to your conversations."}
               </p>
             </div>
-            <form onSubmit={handleSubmit(onSubmit)}>
-              <div className="flex flex-col gap-4">
-                <LabeledInput
-                  label="Email"
-                  name="email"
-                  type="email"
-                  control={control}
-                  placeholder="alex@example.com"
-                  icon={<Mail className="size-4" />}
-                  iconPosition="left"
-                  error={errors.email}
-                />
+            <div className="flex flex-col gap-4">
+              <form onSubmit={handleSubmit(onSubmit)}>
+                <div className="flex flex-col gap-4">
+                  <LabeledInput
+                    label="Email"
+                    name="email"
+                    type="email"
+                    control={control}
+                    placeholder="alex@example.com"
+                    icon={<Mail className="size-4" />}
+                    iconPosition="left"
+                    error={errors.email}
+                  />
 
-                <LabelPasswordInput
-                  label="Password"
-                  name="password"
-                  control={control}
-                  placeholder="Enter your password"
-                  icon={<Lock className="size-4" />}
-                  error={errors.password}
-                />
-                <div className="flex items-center justify-between text-xs">
-                  <label className="flex items-center gap-2 text-muted-foreground">
-                    <Checkbox className="mt-0.5 accent-[#6253d9]" /> Remember me
-                  </label>
-                  <button className="font-medium text-[#6253d9]">
-                    Forgot password?
+                  <LabelPasswordInput
+                    label="Password"
+                    name="password"
+                    control={control}
+                    placeholder="Enter your password"
+                    icon={<Lock className="size-4" />}
+                    error={errors.password}
+                  />
+                  <div className="flex items-center justify-between text-xs">
+                    <label className="flex items-center gap-2 text-muted-foreground">
+                      <Checkbox className="mt-0.5 accent-[#6253d9]" /> Remember
+                      me
+                    </label>
+                    <button className="font-medium text-[#6253d9]">
+                      Forgot password?
+                    </button>
+                  </div>
+
+                  {errors?.root && (
+                    <div>
+                      <p className="text-sm font-normal text-destructive">
+                        {errors?.root?.message}
+                      </p>
+                    </div>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="mt-2 flex h-11 items-center justify-center rounded-xl bg-[#6253d9] text-sm font-semibold text-white transition hover:bg-[#5143c8]"
+                  >
+                    Sign in
                   </button>
                 </div>
-
-                {errors?.root && (
-                  <div>
-                    <p className="text-sm font-normal text-destructive">
-                      {errors?.root?.message}
-                    </p>
-                  </div>
-                )}
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="mt-2 flex h-11 items-center justify-center rounded-xl bg-[#6253d9] text-sm font-semibold text-white transition hover:bg-[#5143c8]"
-                >
-                  Sign in
-                </button>
-                <div className="flex items-center gap-3 py-1 text-xs text-muted-foreground">
-                  <div className="h-px flex-1 bg-border" /> OR{" "}
-                  <div className="h-px flex-1 bg-border" />
-                </div>
-                <button className="flex h-11 items-center justify-center gap-2 rounded-xl border border-border text-sm font-medium transition hover:bg-muted">
-                  <span className="text-base font-bold">G</span> Continue with
-                  Google
-                </button>
+              </form>
+              <div className="flex items-center gap-3 py-1 text-xs text-muted-foreground">
+                <div className="h-px flex-1 bg-border" /> OR{" "}
+                <div className="h-px flex-1 bg-border" />
               </div>
-            </form>
+              <button
+                onClick={handleGoogleLogin}
+                className="flex h-11 items-center justify-center gap-2 rounded-xl border border-border text-sm font-medium transition hover:bg-muted"
+              >
+                <span className="text-base font-bold">G</span> Continue with
+                Google
+              </button>
+            </div>
             <p className="mt-8 text-center text-sm text-muted-foreground">
               Don't have an account?{" "}
               <button
