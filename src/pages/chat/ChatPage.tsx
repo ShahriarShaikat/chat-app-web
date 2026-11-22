@@ -4,11 +4,17 @@ import { Spinner } from "@/components/ui/spinner";
 import {
   useConversation,
   useConversations,
+  useRealtimeConversations,
 } from "@/features/conversations/use-conversations";
-import { useMessages } from "@/features/messages/use-messages";
+import {
+  useMessages,
+  useRealtimeMessages,
+  useSendMessage,
+} from "@/features/messages/use-messages";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import type { Conversation } from "@/types/conversation.types";
+import type { Message } from "@/types/message.types";
 import {
   Archive,
   ArrowLeft,
@@ -324,6 +330,8 @@ function ConversationList({ onNew }: { onNew: () => void }) {
       limit: 20,
     });
 
+  useRealtimeConversations();
+
   useEffect(() => {
     const element = loadMoreRef.current;
 
@@ -496,82 +504,399 @@ function ConversationList({ onNew }: { onNew: () => void }) {
   );
 }
 
-function MessageItem() {
-  return (
+function MessageItem({
+  type,
+  message,
+}: {
+  type: "others" | "me";
+  message: Message;
+}) {
+  const name = message.sender.name || "N/A";
+  return type === "others" ? (
     <div className="flex items-end gap-2">
-      <Avatar initials="JD" color="bg-amber-100 text-amber-800" size="sm" />
+      <Avatar
+        initials={getInitials(name)}
+        color="bg-amber-100 text-amber-800"
+        size="sm"
+      />
       <div>
         <p className="mb-1 text-[11px] text-muted-foreground">
-          John Doe · 10:30 AM
+          {name} · {formatMessageTime(message.createdAt)}
         </p>
         <div className="max-w-md rounded-2xl rounded-bl-md bg-card px-4 py-3 text-sm leading-6 shadow-sm ring-1 ring-border/70">
-          Hey Alex, how are you doing? Are we still on for the design review
-          later?
+          {message.content}
         </div>
       </div>
+    </div>
+  ) : (
+    <div className="flex flex-col items-end gap-1">
+      <div className="max-w-md rounded-2xl rounded-br-md bg-[#6253d9] px-4 py-3 text-sm leading-6 text-white">
+        {message.content}
+      </div>
+      <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+        {formatMessageTime(message.createdAt)}{" "}
+        <CheckCheck className="size-3 text-[#6253d9]" />
+      </span>
     </div>
   );
 }
 
+// function MessageArea() {
+//   const { selectedConversationId, user } = useAuth();
+//   const loadMoreRef = useRef<HTMLDivElement>(null);
+//   const [showNoMoreMessage, setShowNoMoreMessage] = useState(false);
+//   const { data, isLoading } = useConversation(selectedConversationId);
+//   console.log("🚀 ~ MessageArea ~ data:", data);
+
+//   const conversationName = data?.payload?.name
+//     ? data.payload.name
+//     : data?.payload?.members.find((m) =>
+//         user?.userId !== m.user.id ? m.user.name : "",
+//       )?.user.name || "N/A";
+
+//   const {
+//     data: messagesData,
+//     isPending,
+//     isError,
+//     fetchNextPage,
+//     hasNextPage,
+//     isFetchingNextPage,
+//   } = useMessages(selectedConversationId);
+
+//   const messages = messagesData?.pages
+//     ? (messagesData.pages.flatMap((page) => page.payload.data) ?? [])
+//     : [];
+//   console.log(
+//     "🚀 ~ MessageArea ~ messages:",
+//     messages.map((m) => m.content),
+//   );
+
+//   useEffect(() => {
+//     const element = loadMoreRef.current;
+
+//     if (!element) return;
+
+//     const observer = new IntersectionObserver(
+//       async (entries) => {
+//         if (!entries[0].isIntersecting) return;
+
+//         if (isFetchingNextPage) return;
+
+//         if (!hasNextPage) {
+//           setShowNoMoreMessage(true);
+
+//           return;
+//         }
+
+//         await fetchNextPage();
+//       },
+//       {
+//         threshold: 0.1,
+//       },
+//     );
+
+//     observer.observe(element);
+
+//     return () => observer.disconnect();
+//   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+
+//   useEffect(() => {
+//     if (!showNoMoreMessage) return;
+
+//     const timeout = setTimeout(() => {
+//       setShowNoMoreMessage(false);
+//     }, 5000);
+
+//     return () => clearTimeout(timeout);
+//   }, [showNoMoreMessage]);
+
+//   return (
+//     <section className="flex min-w-0 flex-1 flex-col bg-[#fbfbfd]">
+//       {selectedConversationId ? (
+//         <>
+//           <header className="flex h-18.25 items-center justify-between border-b border-border bg-card px-4 sm:px-6">
+//             <div className="flex items-center gap-3">
+//               <button className="icon-button md:hidden">
+//                 <ArrowLeft />
+//               </button>
+//               <Avatar
+//                 initials={getInitials(conversationName)}
+//                 color="bg-amber-100 text-amber-800"
+//                 online
+//               />
+//               <div>
+//                 <h2 className="text-sm font-semibold">{conversationName}</h2>
+//                 <p className="text-xs text-emerald-600">Active now</p>
+//               </div>
+//             </div>
+//             <div className="flex items-center gap-1">
+//               <button className="icon-button hidden sm:flex">
+//                 <Phone />
+//               </button>
+//               <button className="icon-button hidden sm:flex">
+//                 <Video />
+//               </button>
+//               <button className="icon-button">
+//                 <Search />
+//               </button>
+//               <button className="icon-button">
+//                 <MoreHorizontal />
+//               </button>
+//             </div>
+//           </header>
+
+//           {/* Messages */}
+//           <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-8">
+//             <div className="mx-auto flex max-w-3xl flex-col gap-5">
+//               {/* Load More element */}
+//               <div
+//                 ref={loadMoreRef}
+//                 className="w-full items-center justify-center flex "
+//               >
+//                 {isFetchingNextPage && (
+//                   <Spinner className="size-6 text-amber-300" />
+//                 )}
+//                 {showNoMoreMessage && (
+//                   <span className="text-sm text-muted-foreground">
+//                     Oops! No more conversations to load.
+//                   </span>
+//                 )}
+//               </div>
+//               <div className="flex justify-center">
+//                 <span className="rounded-full bg-muted px-3 py-1 text-[10px] font-medium text-muted-foreground">
+//                   Today
+//                 </span>
+//               </div>
+//               {/* <div className="flex items-end gap-2">
+//                 <Avatar
+//                   initials="JD"
+//                   color="bg-amber-100 text-amber-800"
+//                   size="sm"
+//                 />
+//                 <div>
+//                   <p className="mb-1 text-[11px] text-muted-foreground">
+//                     John Doe · 10:30 AM
+//                   </p>
+//                   <div className="max-w-md rounded-2xl rounded-bl-md bg-card px-4 py-3 text-sm leading-6 shadow-sm ring-1 ring-border/70">
+//                     Hey Alex, how are you doing? Are we still on for the design
+//                     review later?
+//                   </div>
+//                 </div>
+//               </div> */}
+//               <MessageItem />
+//               <MessageItem />
+//               <MessageItem />
+//               <MessageItem />
+//               <MessageItem />
+//               <MessageItem />
+//               <MessageItem />
+//               <MessageItem />
+//               <MessageItem />
+//               <div className="flex flex-col items-end gap-1">
+//                 <div className="max-w-md rounded-2xl rounded-br-md bg-[#6253d9] px-4 py-3 text-sm leading-6 text-white">
+//                   Hey! I&apos;m doing great, thanks. Absolutely, I&apos;ve got
+//                   the latest screens ready to walk through.
+//                 </div>
+//                 <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+//                   10:31 AM <CheckCheck className="size-3 text-[#6253d9]" />
+//                 </span>
+//               </div>
+//               <div className="flex items-end gap-2">
+//                 <Avatar
+//                   initials="JD"
+//                   color="bg-amber-100 text-amber-800"
+//                   size="sm"
+//                 />
+//                 <div>
+//                   <p className="mb-1 text-[11px] text-muted-foreground">
+//                     John Doe · 10:32 AM
+//                   </p>
+//                   <div className="max-w-md rounded-2xl rounded-bl-md bg-card px-4 py-3 text-sm leading-6 shadow-sm ring-1 ring-border/70">
+//                     Perfect. I&apos;ll send over the notes beforehand. See you
+//                     then!
+//                   </div>
+//                 </div>
+//               </div>
+//               <div className="my-2 flex items-center gap-3">
+//                 <div className="h-px flex-1 bg-[#d9d6f6]" />
+//                 <span className="text-[10px] font-semibold uppercase tracking-wider text-[#6253d9]">
+//                   Unread
+//                 </span>
+//                 <div className="h-px flex-1 bg-[#d9d6f6]" />
+//               </div>
+//               <div className="flex flex-col items-end gap-1">
+//                 <div className="max-w-md rounded-2xl rounded-br-md bg-[#6253d9] px-4 py-3 text-sm leading-6 text-white">
+//                   Sounds good. Looking forward to it.
+//                 </div>
+//                 <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+//                   Just now <Check className="size-3" />
+//                 </span>
+//               </div>
+//               <div className="flex items-center gap-2 px-12 text-xs text-muted-foreground">
+//                 <span className="flex gap-1">
+//                   <i className="size-1.5 animate-bounce rounded-full bg-muted-foreground" />
+//                   <i className="size-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:120ms]" />
+//                   <i className="size-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:240ms]" />
+//                 </span>{" "}
+//                 John is typing
+//               </div>
+//             </div>
+//           </div>
+//           <div className="border-t border-border bg-card p-4 sm:px-6">
+//             <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-2xl border border-border bg-muted/50 p-2">
+//               <button className="icon-button">
+//                 <Paperclip />
+//               </button>
+//               <textarea
+//                 rows={1}
+//                 placeholder="Write a message..."
+//                 className="max-h-24 min-h-9 flex-1 resize-none bg-transparent px-1 py-2 text-sm outline-none placeholder:text-muted-foreground"
+//               />
+//               <button className="icon-button hidden sm:flex">
+//                 <Smile />
+//               </button>
+//               <button
+//                 className="flex size-9 items-center justify-center rounded-xl bg-[#6253d9] text-white transition hover:bg-[#5143c8]"
+//                 aria-label="Send message"
+//               >
+//                 <Send className="size-4" />
+//               </button>
+//             </div>
+//             <p className="mx-auto mt-2 max-w-3xl text-[10px] text-muted-foreground">
+//               Press Enter to send · Shift + Enter for a new line
+//             </p>
+//           </div>
+//         </>
+//       ) : (
+//         <div className="w-full flex h-full flex-col gap-4 items-center justify-center border">
+//           <img
+//             src="/images/no-messages-illustration-svg-download-png-6430768.webp"
+//             alt="No conversation selected"
+//             className="w-1/3"
+//           />
+//           <div className="text-[#6253d9] px-4 py-3 text-xl font-semibold leading-6">
+//             No conversation selected. Please select a conversation from the list
+//             or start a new one.
+//           </div>
+//         </div>
+//       )}
+//     </section>
+//   );
+// }
 function MessageArea() {
   const { selectedConversationId, user } = useAuth();
-  const loadMoreRef = useRef<HTMLDivElement>(null);
-  const [showNoMoreMessage, setShowNoMoreMessage] = useState(false);
-  const { data, isLoading } = useConversation(selectedConversationId);
-  console.log("🚀 ~ MessageArea ~ data:", data);
+  const [messageInput, setMessageInput] = useState("");
+  const [showNoMoreMessage, setShowNoMoreMessage] = useState<boolean>(false);
 
-  const conversationName = data?.payload?.name
-    ? data.payload.name
-    : data?.payload?.members.find((m) =>
-        user?.userId !== m.user.id ? m.user.name : "",
-      )?.user.name || "N/A";
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const { data } = useConversation(selectedConversationId);
+
+  const conversationName =
+    data?.payload?.name ||
+    data?.payload?.members.find((m) => m.user.id !== user?.userId)?.user.name ||
+    "N/A";
 
   const {
     data: messagesData,
-    isPending,
-    isError,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
   } = useMessages(selectedConversationId);
 
-  const messages = messagesData?.pages
-    ? (messagesData.pages.flatMap((page) => page.payload.data) ?? [])
-    : [];
-  console.log(
-    "🚀 ~ MessageArea ~ messages:",
-    messages.map((m) => m.content),
-  );
+  useRealtimeMessages(selectedConversationId);
 
-  useEffect(() => {
-    const element = loadMoreRef.current;
+  const sendMessageMutation = useSendMessage();
 
-    if (!element) return;
+  // Pages are newest-first; each new page holds older messages.
+  // With column-reverse, index 0 (newest) renders at the bottom.
+  const messages =
+    messagesData?.pages.flatMap((page) => page.payload.data) ?? [];
 
-    const observer = new IntersectionObserver(
-      async (entries) => {
-        if (!entries[0].isIntersecting) return;
+  const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
+    // In a column-reverse scroll container, scrollTop 0 is the bottom
+    scrollContainerRef.current?.scrollTo({ top: 0, behavior });
+  };
 
-        if (isFetchingNextPage) return;
+  const handleSendMessage = () => {
+    const content = messageInput.trim();
 
-        if (!hasNextPage) {
-          setShowNoMoreMessage(true);
+    if (!content || selectedConversationId === null) {
+      return;
+    }
 
-          return;
-        }
-
-        await fetchNextPage();
+    sendMessageMutation.mutate(
+      {
+        conversationId: selectedConversationId,
+        payload: { content },
       },
       {
-        threshold: 0.1,
+        onSuccess: () => {
+          setMessageInput("");
+          scrollToBottom("smooth");
+        },
+        onError: () => {
+          enqueueSnackbar("Failed to send message. Please try again.", {
+            variant: "error",
+          });
+        },
+      },
+    );
+  };
+
+  const handleMessageKeyDown = (
+    event: React.KeyboardEvent<HTMLTextAreaElement>,
+  ) => {
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey &&
+      !event.nativeEvent.isComposing
+    ) {
+      event.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  // Jump to the latest message when the conversation changes
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setShowNoMoreMessage(false);
+    scrollToBottom();
+  }, [selectedConversationId]);
+
+  // Load older messages when the top sentinel comes into view
+  useEffect(() => {
+    const element = loadMoreRef.current;
+    const container = scrollContainerRef.current;
+
+    if (!element || !container || !selectedConversationId) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting || isFetchingNextPage) return;
+
+        if (hasNextPage) {
+          fetchNextPage();
+        } else if (container.scrollHeight > container.clientHeight) {
+          // Only show when the user actually scrolled up to the end
+          setShowNoMoreMessage(true);
+        }
+      },
+      {
+        root: container,
+        rootMargin: "200px 0px 0px 0px", // start loading a bit before the top
       },
     );
 
     observer.observe(element);
 
     return () => observer.disconnect();
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+  }, [selectedConversationId, fetchNextPage, hasNextPage, isFetchingNextPage]);
 
+  // Hide the "no more messages" notice after 5s
   useEffect(() => {
     if (!showNoMoreMessage) return;
 
@@ -617,103 +942,37 @@ function MessageArea() {
             </div>
           </header>
 
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-8">
-            <div className="mx-auto flex max-w-3xl flex-col gap-5">
-              {/* Load More element */}
+          {/* Content: column-reverse so the scroll starts at the bottom */}
+          <div
+            ref={scrollContainerRef}
+            className="flex min-h-0 flex-1 flex-col-reverse overflow-y-auto px-4 py-6 sm:px-8"
+          >
+            <div className="mx-auto flex w-full max-w-3xl flex-col-reverse gap-5">
+              {messages.map((message) => (
+                <MessageItem
+                  key={message.id}
+                  type={message.sender.id === user?.userId ? "me" : "others"}
+                  message={message}
+                />
+              ))}
+
+              {/* Last in the DOM = shown at the top */}
               <div
                 ref={loadMoreRef}
-                className="w-full items-center justify-center flex "
+                className="flex min-h-px w-full items-center justify-center"
               >
                 {isFetchingNextPage && (
                   <Spinner className="size-6 text-amber-300" />
                 )}
                 {showNoMoreMessage && (
                   <span className="text-sm text-muted-foreground">
-                    Oops! No more conversations to load.
+                    Oops! No more messages to load.
                   </span>
                 )}
               </div>
-              <div className="flex justify-center">
-                <span className="rounded-full bg-muted px-3 py-1 text-[10px] font-medium text-muted-foreground">
-                  Today
-                </span>
-              </div>
-              {/* <div className="flex items-end gap-2">
-                <Avatar
-                  initials="JD"
-                  color="bg-amber-100 text-amber-800"
-                  size="sm"
-                />
-                <div>
-                  <p className="mb-1 text-[11px] text-muted-foreground">
-                    John Doe · 10:30 AM
-                  </p>
-                  <div className="max-w-md rounded-2xl rounded-bl-md bg-card px-4 py-3 text-sm leading-6 shadow-sm ring-1 ring-border/70">
-                    Hey Alex, how are you doing? Are we still on for the design
-                    review later?
-                  </div>
-                </div>
-              </div> */}
-              <MessageItem />
-              <MessageItem />
-              <MessageItem />
-              <MessageItem />
-              <MessageItem />
-              <MessageItem />
-              <MessageItem />
-              <MessageItem />
-              <MessageItem />
-              <div className="flex flex-col items-end gap-1">
-                <div className="max-w-md rounded-2xl rounded-br-md bg-[#6253d9] px-4 py-3 text-sm leading-6 text-white">
-                  Hey! I&apos;m doing great, thanks. Absolutely, I&apos;ve got
-                  the latest screens ready to walk through.
-                </div>
-                <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                  10:31 AM <CheckCheck className="size-3 text-[#6253d9]" />
-                </span>
-              </div>
-              <div className="flex items-end gap-2">
-                <Avatar
-                  initials="JD"
-                  color="bg-amber-100 text-amber-800"
-                  size="sm"
-                />
-                <div>
-                  <p className="mb-1 text-[11px] text-muted-foreground">
-                    John Doe · 10:32 AM
-                  </p>
-                  <div className="max-w-md rounded-2xl rounded-bl-md bg-card px-4 py-3 text-sm leading-6 shadow-sm ring-1 ring-border/70">
-                    Perfect. I&apos;ll send over the notes beforehand. See you
-                    then!
-                  </div>
-                </div>
-              </div>
-              <div className="my-2 flex items-center gap-3">
-                <div className="h-px flex-1 bg-[#d9d6f6]" />
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-[#6253d9]">
-                  Unread
-                </span>
-                <div className="h-px flex-1 bg-[#d9d6f6]" />
-              </div>
-              <div className="flex flex-col items-end gap-1">
-                <div className="max-w-md rounded-2xl rounded-br-md bg-[#6253d9] px-4 py-3 text-sm leading-6 text-white">
-                  Sounds good. Looking forward to it.
-                </div>
-                <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                  Just now <Check className="size-3" />
-                </span>
-              </div>
-              <div className="flex items-center gap-2 px-12 text-xs text-muted-foreground">
-                <span className="flex gap-1">
-                  <i className="size-1.5 animate-bounce rounded-full bg-muted-foreground" />
-                  <i className="size-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:120ms]" />
-                  <i className="size-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:240ms]" />
-                </span>{" "}
-                John is typing
-              </div>
             </div>
           </div>
+
           <div className="border-t border-border bg-card p-4 sm:px-6">
             <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-2xl border border-border bg-muted/50 p-2">
               <button className="icon-button">
@@ -721,14 +980,21 @@ function MessageArea() {
               </button>
               <textarea
                 rows={1}
+                value={messageInput}
+                onChange={(event) => setMessageInput(event.target.value)}
+                onKeyDown={handleMessageKeyDown}
                 placeholder="Write a message..."
+                disabled={sendMessageMutation.isPending}
                 className="max-h-24 min-h-9 flex-1 resize-none bg-transparent px-1 py-2 text-sm outline-none placeholder:text-muted-foreground"
               />
               <button className="icon-button hidden sm:flex">
                 <Smile />
               </button>
               <button
-                className="flex size-9 items-center justify-center rounded-xl bg-[#6253d9] text-white transition hover:bg-[#5143c8]"
+                type="button"
+                onClick={handleSendMessage}
+                disabled={sendMessageMutation.isPending}
+                className="flex size-9 cursor-pointer items-center justify-center rounded-xl bg-[#6253d9] text-white transition hover:bg-[#5143c8] disabled:cursor-not-allowed disabled:opacity-60"
                 aria-label="Send message"
               >
                 <Send className="size-4" />
@@ -740,13 +1006,13 @@ function MessageArea() {
           </div>
         </>
       ) : (
-        <div className="w-full flex h-full flex-col gap-4 items-center justify-center border">
+        <div className="flex h-full w-full flex-col items-center justify-center gap-4 border">
           <img
             src="/images/no-messages-illustration-svg-download-png-6430768.webp"
             alt="No conversation selected"
             className="w-1/3"
           />
-          <div className="text-[#6253d9] px-4 py-3 text-xl font-semibold leading-6">
+          <div className="px-4 py-3 text-xl font-semibold leading-6 text-[#6253d9]">
             No conversation selected. Please select a conversation from the list
             or start a new one.
           </div>

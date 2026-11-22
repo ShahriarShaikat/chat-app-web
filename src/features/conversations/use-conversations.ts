@@ -1,5 +1,11 @@
+import { socket } from "@/lib/socket";
 import type { ConversationListParams } from "@/types/conversation.types";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { useEffect } from "react";
 import { getConversation, getConversations } from "./conversation-api";
 import { conversationKeys } from "./conversation-keys";
 
@@ -9,6 +15,24 @@ import { conversationKeys } from "./conversation-keys";
 //     queryFn: () => getConversations(params),
 //   });
 // };
+
+export function useRealtimeConversations() {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const handleConversationCreated = () => {
+      queryClient.invalidateQueries({
+        queryKey: conversationKeys.lists(),
+      });
+    };
+
+    socket.on("conversation:created", handleConversationCreated);
+
+    return () => {
+      socket.off("conversation:created", handleConversationCreated);
+    };
+  }, [queryClient]);
+}
 
 export const useConversations = (params: ConversationListParams = {}) => {
   const { page = 1, limit = 20, ...filters } = params;
