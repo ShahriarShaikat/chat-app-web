@@ -62,9 +62,9 @@ export function useRealtimeMessages(conversationId: number | null) {
       });
 
       // Refresh the conversation sidebar.
-      queryClient.invalidateQueries({
-        queryKey: ["conversations", "list"],
-      });
+      // queryClient.invalidateQueries({
+      //   queryKey: ["conversations", "list"],
+      // });
     };
 
     // Join when connected, and rejoin after reconnection.

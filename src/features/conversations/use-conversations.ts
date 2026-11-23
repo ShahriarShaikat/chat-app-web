@@ -1,35 +1,38 @@
 import { socket } from "@/lib/socket";
-import type { ConversationListParams } from "@/types/conversation.types";
+import type {
+  ConversationListParams,
+  CreateDirectConversationDto,
+} from "@/types/conversation.types";
 import {
   useInfiniteQuery,
+  useMutation,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { getConversation, getConversations } from "./conversation-api";
+import {
+  createDirectConversation,
+  getConversation,
+  getConversations,
+} from "./conversation-api";
 import { conversationKeys } from "./conversation-keys";
-
-// export const useConversations = (params: ConversationListParams = {}) => {
-//   return useInfiniteQuery({
-//     queryKey: conversationKeys.list(params),
-//     queryFn: () => getConversations(params),
-//   });
-// };
 
 export function useRealtimeConversations() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const handleConversationCreated = () => {
+    const invalidateConversationList = () => {
       queryClient.invalidateQueries({
         queryKey: conversationKeys.lists(),
       });
     };
 
-    socket.on("conversation:created", handleConversationCreated);
+    socket.on("conversation:created", invalidateConversationList);
+    socket.on("conversation:updated", invalidateConversationList);
 
     return () => {
-      socket.off("conversation:created", handleConversationCreated);
+      socket.off("conversation:created", invalidateConversationList);
+      socket.off("conversation:updated", invalidateConversationList);
     };
   }, [queryClient]);
 }
@@ -74,3 +77,18 @@ export const useConversation = (conversationId: number | null) => {
     enabled: !!conversationId,
   });
 };
+
+export function useCreateDirectConversation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: CreateDirectConversationDto) =>
+      createDirectConversation(data),
+
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: conversationKeys.lists(),
+      });
+    },
+  });
+}

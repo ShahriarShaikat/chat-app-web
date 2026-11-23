@@ -4,6 +4,7 @@ import { Spinner } from "@/components/ui/spinner";
 import {
   useConversation,
   useConversations,
+  useCreateDirectConversation,
   useRealtimeConversations,
 } from "@/features/conversations/use-conversations";
 import {
@@ -11,6 +12,7 @@ import {
   useRealtimeMessages,
   useSendMessage,
 } from "@/features/messages/use-messages";
+import { usePaginatedUsers } from "@/features/users/use-user";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import type { Conversation } from "@/types/conversation.types";
@@ -373,7 +375,7 @@ function ConversationList({ onNew }: { onNew: () => void }) {
 
   const conversationListData =
     data?.pages.flatMap((page) => page.payload.data) ?? [];
-  console.log("🚀 ~ ConversationList ~ conversations:", conversationListData);
+  // console.log("🚀 ~ ConversationList ~ conversations:", conversationListData);
 
   return (
     <aside className="flex w-full shrink-0 flex-col border-r border-border bg-card md:w-75 xl:w-82.5">
@@ -1088,11 +1090,98 @@ function DetailsPanel() {
 }
 
 function NewConversation({ onClose }: { onClose: () => void }) {
-  const [selected, setSelected] = useState<string[]>([]);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const [showNoMoreMessage, setShowNoMoreMessage] = useState(false);
+  const [selected, setSelected] = useState<number[]>([]);
   const [query, setQuery] = useState("");
-  const visible = people.filter((p) =>
-    p.name.toLowerCase().includes(query.toLowerCase()),
-  );
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const createDirectConversation = useCreateDirectConversation();
+
+  const handleCreateDirectConversation = (userId: number) => {
+    if (!userId) {
+      return;
+    }
+
+    createDirectConversation.mutate(
+      {
+        userId,
+      },
+      {
+        onSuccess: (data) => {
+          console.log("🚀 ~ handleCreateDirectConversation ~ data:", data);
+        },
+        onError: () => {
+          enqueueSnackbar("Failed to create conversation. Please try again.", {
+            variant: "error",
+          });
+        },
+      },
+    );
+  };
+
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
+    usePaginatedUsers({
+      search: debouncedQuery,
+    });
+
+  useEffect(() => {
+    // Set a timer to update the debounced value after 500ms
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 500);
+
+    // Cancel the timer if the user types again before 500ms
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  // Trigger your API call or side effect when debouncedQuery changes
+  useEffect(() => {
+    if (!debouncedQuery) return;
+    console.log("Fetching results for:", debouncedQuery);
+  }, [debouncedQuery]);
+
+  useEffect(() => {
+    const element = loadMoreRef.current;
+
+    if (!element) return;
+
+    const observer = new IntersectionObserver(
+      async (entries) => {
+        if (!entries[0].isIntersecting) return;
+
+        if (isFetchingNextPage) return;
+
+        if (!hasNextPage) {
+          setShowNoMoreMessage(true);
+
+          return;
+        }
+
+        await fetchNextPage();
+      },
+      {
+        threshold: 0.1,
+      },
+    );
+
+    observer.observe(element);
+
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+
+  useEffect(() => {
+    if (!showNoMoreMessage) return;
+
+    const timeout = setTimeout(() => {
+      setShowNoMoreMessage(false);
+    }, 5000);
+
+    return () => clearTimeout(timeout);
+  }, [showNoMoreMessage]);
+
+  const userListData = data?.pages.flatMap((page) => page.payload.data) ?? [];
+  console.log("🚀 ~ NewConversation ~ userListData:", userListData);
+
   return (
     <div className="absolute inset-0 z-20 flex items-end justify-center bg-foreground/20 p-0 backdrop-blur-[2px] sm:items-center sm:p-6">
       <div className="flex h-full w-full max-w-lg flex-col bg-card shadow-2xl sm:h-auto sm:max-h-180 sm:rounded-2xl sm:border sm:border-border">
@@ -1124,40 +1213,51 @@ function NewConversation({ onClose }: { onClose: () => void }) {
                 Selected people
               </p>
               <div className="flex flex-wrap gap-2">
-                {selected.map((name) => (
-                  <span
-                    key={name}
-                    className="flex items-center gap-1.5 rounded-full bg-[#efedff] px-2.5 py-1 text-xs font-medium text-[#6253d9]"
-                  >
-                    {name}
-                    <button
-                      onClick={() =>
-                        setSelected(selected.filter((s) => s !== name))
-                      }
+                {selected.map((id) => {
+                  const person = userListData.find((p) => p.id === id);
+                  return (
+                    <span
+                      key={`selected-${id}`}
+                      className="flex items-center gap-1.5 rounded-full bg-[#efedff] px-2.5 py-1 text-xs font-medium text-[#6253d9]"
                     >
-                      <X className="size-3" />
-                    </button>
-                  </span>
-                ))}
+                      {person?.name}
+                      <button
+                        onClick={() =>
+                          setSelected(selected.filter((s) => s !== person?.id))
+                        }
+                        className="cursor-pointer rounded-full p-0.5 text-[#6253d9] transition hover:bg-[#6253d9]/20"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </span>
+                  );
+                })}
               </div>
             </div>
           )}
+
           <div className="mt-6">
             <p className="mb-2 text-xs font-semibold text-muted-foreground">
               Suggested people
             </p>
-            {visible.length ? (
+
+            {isLoading && (
+              <div className="flex h-full items-center justify-center">
+                <Spinner className="size-6 text-amber-300" />
+              </div>
+            )}
+            {userListData.length ? (
               <div className="flex flex-col gap-1">
-                {visible.map((person) => {
-                  const isSelected = selected.includes(person.name);
+                {userListData.map((person) => {
+                  const isSelected = selected.includes(person.id);
                   return (
                     <button
-                      key={person.name}
+                      key={person.id}
                       onClick={() =>
                         setSelected(
                           isSelected
-                            ? selected.filter((s) => s !== person.name)
-                            : [...selected, person.name],
+                            ? selected.filter((s) => s !== person.id)
+                            : [...selected, person.id],
                         )
                       }
                       className={cn(
@@ -1165,10 +1265,15 @@ function NewConversation({ onClose }: { onClose: () => void }) {
                         isSelected && "bg-[#f5f4ff]",
                       )}
                     >
-                      <Avatar
+                      {/* <Avatar
                         initials={person.initials}
                         color={person.color}
                         online={person.online}
+                      /> */}
+                      <Avatar
+                        initials={getInitials(person.name)}
+                        color={"bg-sky-100 text-sky-700"}
+                        online={true}
                       />
                       <div className="flex-1">
                         <p className="text-sm font-medium">{person.name}</p>
@@ -1193,6 +1298,20 @@ function NewConversation({ onClose }: { onClose: () => void }) {
                     </button>
                   );
                 })}
+
+                <div
+                  ref={loadMoreRef}
+                  className="w-full items-center justify-center flex"
+                >
+                  {isFetchingNextPage && (
+                    <Spinner className="size-6 text-amber-300" />
+                  )}
+                  {showNoMoreMessage && (
+                    <span className="text-sm text-muted-foreground">
+                      Oops! No more users to load
+                    </span>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="py-12 text-center">
@@ -1227,7 +1346,14 @@ function NewConversation({ onClose }: { onClose: () => void }) {
         <footer className="border-t border-border p-5">
           <button
             disabled={!selected.length}
-            className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#6253d9] text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+            onClick={() => {
+              if (selected.length === 1) {
+                handleCreateDirectConversation(selected[0]);
+              } else {
+                console.log("Create group conversation with:", selected);
+              }
+            }}
+            className="flex cursor-pointer h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#6253d9] text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
           >
             {selected.length > 1 ? (
               <>
