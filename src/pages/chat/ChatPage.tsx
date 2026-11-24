@@ -14,6 +14,8 @@ import {
 } from "@/features/messages/use-messages";
 import { usePaginatedUsers } from "@/features/users/use-user";
 import { useAuth } from "@/hooks/useAuth";
+import { useTypingIndicator } from "@/hooks/useTypingIndicator";
+import { socket } from "@/lib/socket";
 import { cn } from "@/lib/utils";
 import type { Conversation } from "@/types/conversation.types";
 import type { Message } from "@/types/message.types";
@@ -43,36 +45,36 @@ import {
 import { enqueueSnackbar } from "notistack";
 import { useEffect, useRef, useState } from "react";
 
-const people = [
-  {
-    name: "John Doe",
-    email: "john@example.com",
-    initials: "JD",
-    color: "bg-amber-100 text-amber-800",
-    online: true,
-  },
-  {
-    name: "Sarah Ahmed",
-    email: "sarah@example.com",
-    initials: "SA",
-    color: "bg-violet-100 text-violet-700",
-    online: true,
-  },
-  {
-    name: "Michael Smith",
-    email: "michael@example.com",
-    initials: "MS",
-    color: "bg-sky-100 text-sky-700",
-    online: false,
-  },
-  {
-    name: "Emily Chen",
-    email: "emily@example.com",
-    initials: "EC",
-    color: "bg-rose-100 text-rose-700",
-    online: true,
-  },
-];
+// const people = [
+//   {
+//     name: "John Doe",
+//     email: "john@example.com",
+//     initials: "JD",
+//     color: "bg-amber-100 text-amber-800",
+//     online: true,
+//   },
+//   {
+//     name: "Sarah Ahmed",
+//     email: "sarah@example.com",
+//     initials: "SA",
+//     color: "bg-violet-100 text-violet-700",
+//     online: true,
+//   },
+//   {
+//     name: "Michael Smith",
+//     email: "michael@example.com",
+//     initials: "MS",
+//     color: "bg-sky-100 text-sky-700",
+//     online: false,
+//   },
+//   {
+//     name: "Emily Chen",
+//     email: "emily@example.com",
+//     initials: "EC",
+//     color: "bg-rose-100 text-rose-700",
+//     online: true,
+//   },
+// ];
 
 // const conversations = [
 //   {
@@ -794,11 +796,11 @@ function MessageArea() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const { data } = useConversation(selectedConversationId);
-
-  const conversationName =
-    data?.payload?.name ||
-    data?.payload?.members.find((m) => m.user.id !== user?.userId)?.user.name ||
-    "N/A";
+  const { typingUsers, handleTyping, stopTyping } = useTypingIndicator({
+    socket,
+    conversationId: selectedConversationId,
+    currentUserId: user?.userId as number,
+  });
 
   const {
     data: messagesData,
@@ -810,6 +812,15 @@ function MessageArea() {
   useRealtimeMessages(selectedConversationId);
 
   const sendMessageMutation = useSendMessage();
+
+  const conversationName =
+    data?.payload?.name ||
+    data?.payload?.members.find((m) => m.user.id !== user?.userId)?.user.name ||
+    "N/A";
+
+  const typingNames = data?.payload?.members
+    .filter((member) => typingUsers.includes(member.userId))
+    .map((member) => member.user.name);
 
   // Pages are newest-first; each new page holds older messages.
   // With column-reverse, index 0 (newest) renders at the bottom.
@@ -827,6 +838,8 @@ function MessageArea() {
     if (!content || selectedConversationId === null) {
       return;
     }
+
+    stopTyping();
 
     sendMessageMutation.mutate(
       {
@@ -857,6 +870,18 @@ function MessageArea() {
     ) {
       event.preventDefault();
       handleSendMessage();
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+
+    setMessageInput(value);
+
+    if (value.trim()) {
+      handleTyping();
+    } else {
+      stopTyping();
     }
   };
 
@@ -950,6 +975,19 @@ function MessageArea() {
             className="flex min-h-0 flex-1 flex-col-reverse overflow-y-auto px-4 py-6 sm:px-8"
           >
             <div className="mx-auto flex w-full max-w-3xl flex-col-reverse gap-5">
+              {typingUsers.length > 0 && (
+                <div className="flex items-center gap-2 px-12 text-xs text-muted-foreground">
+                  <span className="flex gap-1">
+                    <i className="size-1.5 animate-bounce rounded-full bg-muted-foreground" />
+                    <i className="size-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:120ms]" />
+                    <i className="size-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:240ms]" />
+                  </span>{" "}
+                  {typingUsers.length === 1
+                    ? `${typingNames?.[0]} is typing`
+                    : `${typingNames?.join(", ")} are typing`}
+                </div>
+              )}
+
               {messages.map((message) => (
                 <MessageItem
                   key={message.id}
@@ -983,7 +1021,7 @@ function MessageArea() {
               <textarea
                 rows={1}
                 value={messageInput}
-                onChange={(event) => setMessageInput(event.target.value)}
+                onChange={handleInputChange}
                 onKeyDown={handleMessageKeyDown}
                 placeholder="Write a message..."
                 disabled={sendMessageMutation.isPending}
